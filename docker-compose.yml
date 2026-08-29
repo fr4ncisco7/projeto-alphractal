@@ -9,6 +9,7 @@ services:
       - "5433:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -31,6 +32,9 @@ services:
     environment:
       SOLVER_URL: http://solver-python:8000
       DATABASE_URL: ${DATABASE_URL}
+      RPC_HTTP_URL: ${RPC_HTTP_URL}
+      RPC_WS_URL: ${RPC_WS_URL}
+      INGESTAO_ATIVA: ${INGESTAO_ATIVA:-true}
     depends_on:
       db:
         condition: service_healthy
