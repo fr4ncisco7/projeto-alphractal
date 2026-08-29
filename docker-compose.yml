@@ -1,0 +1,41 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  solver-python:
+    build: ./apps/solver
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/solver:/app
+
+  backend-node:
+    build: ./apps/backend-node
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/backend-node/src:/app/src
+    environment:
+      SOLVER_URL: http://solver-python:8000
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+      solver-python:
+        condition: service_started
+
+volumes:
+  db-data:
