@@ -38,11 +38,35 @@ Não estão importados aqui de propósito (são longos) — leia sob demanda qua
 custo_i = nível_e_sazonalidade_hora(hora de i) × fator_dia_da_semana(dia de i)
 ```
 
-- Etapa 1: suavização exponencial sazonal (Holt-Winters via `statsmodels`), sem tendência, sazonalidade multiplicativa, período=24h
-- Etapa 2: fator de dia da semana a partir do resíduo da etapa 1
+- Etapa 1: **fator de dia da semana primeiro**, a partir das médias diárias (mediana entre as
+  semanas). A média de um dia calendário contém as 24h, então já está livre da sazonalidade horária
+- Etapa 2: série dividida por esse fator, e então Holt-Winters via `statsmodels` (sem tendência,
+  sazonalidade multiplicativa, período=24h) para a hora do dia
+- **Não inverter essa ordem** — tirar o fator de dia do resíduo do Holt-Winters foi testado e
+  falhou: o nível (alpha) absorve a queda de fim de semana antes dela chegar ao resíduo. Custava
+  ~51% de perda em horizontes ≥48h (ver decisão 17)
 - **Não usar** um único modelo de 168 posições (hora×dia combinados) — testado e falhou (poucos dados por slot, pior que média simples; ver decisão 8)
 - Módulo já implementado: `apps/solver/estimador_custo.py` (funções `treinar` e `prever`) — usar como base, não reescrever do zero
 
 ## Convenções
 
-<!-- preencher conforme o time for definindo: lint, testes, branch strategy, etc. -->
+- **Nomenclatura híbrida:** termos do protocolo Ethereum em inglês (`base_fee`, `priority_fee`,
+  `gas_used`, `gas_limit`, `block_number`) — são os nomes oficiais; o resto em português
+  (`momento`, `media`, `mediana`, `preco_efetivo`, `bloco_gas`). Vale para schema, código e API.
+- **Commits:** Conventional Commits em português, uma linha, sem corpo
+  (`feat: adiciona estimador de custo`).
+
+<!-- preencher conforme o time for definindo: lint, testes, branch strategy -->
+
+## Layout
+
+```
+apps/backend-node/   Express + TS — ingestão, SSE, orquestra o solver
+apps/solver/         FastAPI — estimador_custo.py + otimizador.py, endpoint /optimize
+db/init/             schema aplicado no boot do container (só com volume vazio)
+db/seed/             dado sintético para dev — NÃO roda sozinho
+scripts/reset-db.sh  recria o banco do zero (destrói o volume)
+```
+
+Alterar schema exige `./scripts/reset-db.sh` — o entrypoint do Postgres só roda `db/init/`
+quando o volume está vazio. Trocar por migrations versionadas quando houver dado real.

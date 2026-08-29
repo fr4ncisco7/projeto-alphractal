@@ -2,7 +2,7 @@
 
 > Documento vivo. Cada entrada registra o que foi decidido, por quê, e as fontes que embasaram a escolha (quando aplicável). Atualizar conforme o projeto avança — decisões em aberto ficam marcadas como tal.
 
-**Última atualização:** 24/08/2026
+**Última atualização:** 29/08/2026
 
 ---
 
@@ -122,6 +122,10 @@ Preserva o comportamento original (30% de N) quando o horizonte é longo o basta
 
 ## 8. Estimador de custo por janela: decomposição hora-do-dia + dia-da-semana (testada e validada)
 
+> **A ORDEM das etapas foi corrigida em 29/08/2026 — ver decisão 17.** A fórmula abaixo
+> continua válida; o que mudou é que o fator de dia da semana passou a ser estimado
+> **antes** do Holt-Winters, direto do dado, em vez de sair do resíduo dele.
+
 **Decisão final (revisada após teste):** `custo_i = nível_e_sazonalidade_hora(hora de i) × fator_dia_da_semana(dia de i)`, calculado em duas etapas:
 
 1. **Hora do dia:** suavização exponencial sazonal (Holt-Winters, sem tendência, sazonalidade multiplicativa, período=24h) via `statsmodels.tsa.holtwinters.ExponentialSmoothing` — parâmetros de suavização ajustados automaticamente por máxima verossimilhança, não escolhidos à mão
@@ -181,9 +185,112 @@ A formulação matemática do otimizador (decisões 3, 6, 9) está fechada e tes
 
 ---
 
+## 14. Banco: TimescaleDB, com gapfill na leitura
 
+**Decisão:** TimescaleDB (Postgres + extensão de séries temporais) em vez de Postgres puro. Hypertable `bloco_gas` para a captura por bloco, continuous aggregates `gas_1min` e `gas_1h`, função `serie_horaria(início, fim)` para a série que alimenta o estimador. Schema em `db/init/01_schema.sql`.
+
+**Motivo:** a decisão 1 descreve exatamente o padrão que a extensão resolve nativamente (bruto por evento + rollups materializados). Mesma superfície SQL do Postgres, sem custo de aprendizado extra.
+
+**Duas escolhas dentro do schema que merecem registro:**
+
+- **As agregações saem direto da hypertable, não em cascata.** Seria mais barato construir `gas_1h` sobre `gas_1min`, mas mediana não é composável: a mediana de 60 medianas de 1min não é a mediana da hora. Média/mín/máx seriam composáveis — manter as duas com a mesma fonte evita ter métricas com semânticas diferentes na mesma linha.
+- **Valores gravados em wei (`BIGINT`), não gwei.** Wei é o inteiro exato que o RPC devolve; converter na gravação introduziria arredondamento. `BIGINT` tem ~6 ordens de grandeza de folga (1000 gwei = 1e12 wei; limite do tipo = 9,2e18). Conversão para gwei acontece na leitura.
+
+**Sobre buracos na série:** a decisão 8 exige série horária contígua — o Holt-Winters sazonal quebra se faltar hora, e queda de rede ou reorg produzem buraco. Resolvido com `time_bucket_gapfill` + `interpolate()` **na leitura**, dentro de `serie_horaria()`. Nunca se grava linha sintética no banco: o dado bruto continua sendo só o que foi de fato observado.
+
+---
+
+## 15. O endpoint `/optimize` faz estimativa E otimização
+
+**Decisão:** o backend Node envia a série histórica horária (de `serie_horaria()`) junto com `N`, `horas_ate_deadline` e `gas_used`; o solver treina o estimador e resolve o MILP numa chamada só.
+
+**Motivo:** o diagrama 9.2 da arquitetura originalmente punha o cálculo do custo no Node ("busca custo estimado por janela (média móvel)"). Isso fazia sentido enquanto o estimador era uma média móvel, calculável em SQL. A **decisão 8 tornou isso Python-only** — Holt-Winters via `statsmodels`, que o Node não executa. Manter a estimativa junto do MILP evita um serviço intermediário ou uma reimplementação do estimador em JavaScript.
+
+**Custo aceito:** `/optimize` fica com duas responsabilidades. Se aparecer necessidade de cachear a estimativa separadamente (ela é bem mais cara que o MILP), dá pra quebrar em `/estimate` + `/optimize` sem mudar o contrato com o frontend.
+
+---
+
+## 16. Horizonte parcial: truncar para baixo
+
+**Decisão:** deadline que não cai em fronteira de hora é **truncado para baixo** — 5h30 vira 5 janelas de 1h. *(Fecha a pendência que estava em aberto neste documento.)*
+
+**Motivo:** conservador por construção — nunca recomenda executar depois do prazo real do usuário. As alternativas: arredondar para cima alocaria transação numa janela que ultrapassa o deadline (inaceitável para o usuário institucional, que tem prazo contratual); janela parcial com peso proporcional aproveitaria o horizonte inteiro, mas deixa o teto por janela com semântica estranha (o que significa "30% de N" numa janela de 30 minutos?).
+
+**Custo aceito:** perde-se até 59 minutos de oportunidade. Irrelevante num horizonte de 24 janelas; relevante num horizonte de 2 — daí o erro 422 explícito quando o horizonte trunca para zero janelas.
+
+---
+
+## 17. Correção da etapa 2 do estimador: fator de dia da semana antes do Holt-Winters
+
+**Problema encontrado (29/08/2026):** a etapa 2 da decisão 8 não estava recuperando o efeito de dia da semana. Medido com dado sintético de razão realizada conhecida: recuperava 0,90–0,98 quando a razão de fato no dado era ~0,61 — ou seja, quase nada do efeito.
+
+**Causa raiz — é uma questão de ORDEM, não de fórmula.** A versão original ajustava o Holt-Winters primeiro e tirava o fator de dia do resíduo (`observado ÷ previsto`). Mas o nível do Holt-Winters é uma média móvel que persegue a observação: com `alpha` ajustado por máxima verossimilhança entre 0,22 e 1,00, ele absorvia a queda de fim de semana **conforme ela acontecia**, e o resíduo voltava a ~1,0 em todo dia da semana. O efeito nunca chegava à etapa 2. O `gamma` (suavização sazonal) também colapsou para 0,000 nos testes — mesmo modo de falha que a decisão 8 atribui ao modelo de 168 posições descartado.
+
+**Correção:** inverter a ordem.
+
+1. Fator de dia da semana estimado **primeiro, direto do dado bruto**, a partir das **médias diárias**. Cada dia calendário contém as 24 horas, então a média diária já está livre da sazonalidade de hora do dia — a razão entre a média de um dia e a média global isola o efeito do dia da semana sem contaminação. Usa **mediana** entre as semanas, não média: gas tem cauda pesada (decisão 6) e um único pico de 15x num sábado não pode redefinir o fator de sábado.
+2. A série é dividida por esse fator, ficando neutra quanto a dia da semana.
+3. O Holt-Winters é ajustado na série já ajustada — o nível não tem mais padrão semanal para perseguir.
+4. Na previsão, as duas estimativas voltam a ser multiplicadas (fórmula da decisão 8, inalterada).
+
+**Por que isso importa — o defeito distorcia a decisão, não só o custo reportado.** Em horizonte de 24h o erro era inofensivo: o nível do Holt-Winters fica congelado no último ponto, então o erro era *uniforme* nas 24 horas, e o MILP é invariante a escala — a ordenação das janelas não mudava. A partir de 48h o erro deixa de ser uniforme e o otimizador passava a **ignorar o fim de semana inteiro**, que é justamente a janela mais barata.
+
+| Horizonte | Perda vs. onisciente (antes) | Depois | Aloca no fds (antes → depois) |
+|---|---|---|---|
+| 24h | 0,01% | 0,59% | 70% → 100% |
+| 48h | **50,9%** | **0,70%** | 0% → 100% |
+| 72h | **51,0%** | **0,72%** | 0% → 100% |
+| 96h | **51,5%** | **0,72%** | 0% → 100% |
+
+*(Referência: o otimizador onisciente, com previsão perfeita, aloca 90–100% no fim de semana.)*
+
+**Custo aceito:** o caso de 24h piorou de leve — captura 95,0% do ganho teórico contra 99,2% antes. É ruído de amostragem do fator (com 4 semanas há só 4 sábados para estimar o fator de sábado). Troca claramente favorável: 4 pontos percentuais no caso curto contra 50 no caso longo. O estimador continua batendo a média histórica simples em **100%** das origens testadas.
+
+**Estabilidade vs. histórico disponível:** desvio-padrão da razão fim-de-semana/útil entre sementes — 0,066 com 2 semanas, 0,028 com 4 semanas (mínimo recomendado), 0,017 com 26. Encolhimento (shrinkage) do fator em direção a 1,0 foi considerado para o caso de pouco histórico e **descartado**: complexidade sem ganho claro a partir de 4 semanas.
+
+**Ressalva:** validação em dado sintético. O desconto de fim de semana injetado (~0,55–0,61) é provavelmente mais forte e mais limpo que o real, então os 50% de perda evitada são teto, não estimativa. Revalidar com dado real de gas — a pendência da decisão 8 continua de pé.
+
+---
+
+## 18. Ingestão RPC: dois caminhos, e o limite de histórico do provedor
+
+**Decisão:** `viem` (não ethers.js) — TypeScript-first, tipagem melhor. Provedor configurável por `RPC_HTTP_URL`/`RPC_WS_URL`, então serve Alchemy, Infura, publicnode ou nó próprio.
+
+**Dois caminhos, porque um só não resolve:**
+
+| | Ao vivo (`ingestao.ts`) | Backfill (`backfill.ts`) |
+|---|---|---|
+| Gatilho | assinatura `newHeads` via WebSocket | sob demanda: `npm run backfill -- <horas>` |
+| Fonte | header do bloco + `eth_feeHistory` de 1 bloco | `eth_feeHistory` em lotes de 1024 |
+| `momento` | timestamp real do header | interpolado entre âncoras reais |
+| `gas_used`/`gas_limit` | preenchidos | **NULL** — `feeHistory` não devolve |
+
+O backfill existe porque o estimador precisa de ~4 semanas (decisão 8) e a ingestão ao vivo levaria 4 semanas para acumular isso. Usa `feeHistory` em lote porque header a header seriam ~200 mil chamadas para 4 semanas, contra ~200.
+
+**LIMITE DE HISTÓRICO DO PROVEDOR — fecha a pendência que estava aberta.** Medido no endpoint público `ethereum-rpc.publicnode.com` em 29/08/2026:
+
+- `eth_feeHistory` com `blockCount=1024` a partir de `latest`: **funciona** — 3,4h de histórico
+- `eth_feeHistory` com **número de bloco explícito**: só até ~32 blocos da cabeça (~6 min). Além disso o nó responde `Archive requests require a personal token`
+
+Ou seja: **no endpoint público o backfill trava em ~3,4 horas.** Para as ~4 semanas que o estimador precisa, é obrigatório uma chave Alchemy ou Infura. O backfill detecta a recusa, para limpo e avisa quantas horas conseguiu — não estoura.
+
+**Consequência de cronograma:** enquanto não houver chave, o `/optimize` não roda com dado real (ele exige no mínimo 48h de histórico). A ingestão ao vivo acumula ~24h por dia, então mesmo sem chave o histórico se forma sozinho — só leva tempo.
+
+---
+
+## 19. Timestamps do backfill: interpolação por trechos, e a armadilha da chave primária
+
+Duas correções feitas ao validar a ingestão contra a mainnet, ambas achadas por medição e não por leitura de código.
+
+**a) Interpolação de timestamp precisa de âncoras intermediárias.** `eth_feeHistory` não devolve timestamp. A primeira versão ancorava só nas pontas de cada lote de 1024 blocos e interpolava linearmente a 12s. Erro medido: **até 12 segundos** — um bloco inteiro, o bastante para jogar o registro no balde de 1min errado. Causa: pós-merge os slots são de 12s exatos, mas slot perdido (~0,5-1%) faz o relógio real descolar da contagem de blocos. Corrigido ancorando a cada **128 blocos** (~9 chamadas por lote em vez de 2): erro caiu para **0,8s em média, 7s no pior caso**, com 9 de 12 blocos amostrados exatos.
+
+**b) A chave primária NÃO deduplica bloco.** A PK é `(momento, block_number)` — a hypertable exige a coluna de tempo em qualquer índice único, então não dá para ter `UNIQUE(block_number)`. Mas o backfill grava momento *interpolado* e a ingestão ao vivo grava o momento *real*: para o mesmo bloco os dois diferem em alguns segundos, o `ON CONFLICT` não disparava e **o bloco entrava duas vezes**. Confirmado em dado real — 8 blocos duplicados na sobreposição entre os dois caminhos. Corrigido com `NOT EXISTS` por `block_number` na query de inserção; quem chega primeiro no bloco vence. Verificado depois: 0 duplicatas, 0 intervalos negativos, intervalo médio 12,04s.
+
+---
+
+## Pendências em aberto
 
 - Fórmula do índice engenheirado de gas (análogo ao CVDD)
-- Limite de histórico disponível no provedor RPC (Alchemy/Infura)
+- **Obter chave Alchemy/Infura** — sem ela o backfill trava em 3,4h (ver decisão 18)
 - Recalibrar teto (decisão 6) com dado histórico real assim que capturado
-- Tratamento de horizonte parcial (deadline que não cai em fronteira de hora)
+- Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado sintético

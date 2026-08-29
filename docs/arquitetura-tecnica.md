@@ -32,7 +32,18 @@ Duas granularidades diferentes, para propósitos diferentes:
   - **1 minuto** — camada intermediária (média/mediana/min/max dentro da janela)
   - **1 hora** — usada pela visão de calendário e pelo otimizador (decisões de execução acontecem em janelas de minutos/horas, não segundos)
 
-Na prática: uma tabela granular por bloco + uma tabela (ou view materializada) já agregada por hora, pra evitar que o otimizador e as queries de estatística varram o dado bruto inteiro toda vez.
+Na prática (implementado em `db/init/01_schema.sql`):
+
+| Objeto | O que é | Para quê |
+|---|---|---|
+| `bloco_gas` | hypertable, um registro por bloco | captura bruta; `preco_efetivo_wei` é coluna gerada (`base_fee + priority_fee_p50`) |
+| `gas_1min` | continuous aggregate | camada intermediária (média/mediana/mín/máx) |
+| `gas_1h` | continuous aggregate | calendário e estatísticas horárias |
+| `serie_horaria(início, fim)` | função | série horária **sem buracos** (via `time_bucket_gapfill` + `interpolate`) para alimentar o estimador |
+
+As duas agregações saem direto da hypertable, e não em cascata (1h sobre 1min): mediana não é composável — a mediana de 60 medianas de 1min não é a mediana da hora. Média, mediana, mín e máx ficam materializados; **moda** é calculada em query (`mode()` sobre um dia é barato e não justifica materialização).
+
+`serie_horaria()` existe porque a decisão 8 exige série contígua: o Holt-Winters sazonal quebra se faltar hora, e queda de rede ou reorg produzem buraco. O preenchimento acontece **na leitura** — nunca se grava linha sintética no banco.
 
 ## 5. Visualização
 
@@ -45,21 +56,25 @@ Duas bibliotecas, cada uma cobrindo uma necessidade:
 
 Análogo ao CVDD (Cumulative Value-Days Destroyed) usado pela Alphractal para Bitcoin — uma fórmula de engenharia com fator de ajuste que converte o dado bruto de gas numa métrica única de "saúde"/custo real da rede, **não** um modelo estatístico preditivo. A fórmula em si ainda não está fechada — é matemática nova que precisa ser proposta e validada por vocês dois, usando como inspiração conceitual o CDD→CVDD e o Difficulty per Issuance.
 
-## 7. Otimizador de execução (LP / Simplex)
+## 7. Otimizador de execução (MILP)
 
-**O que resolve:** dado um volume a executar até um deadline, recomenda como distribuir a execução ao longo do tempo pra minimizar custo total de gas.
+**O que resolve:** dado um número de transações a executar até um deadline, recomenda como distribuir a execução ao longo do tempo pra minimizar custo total de gas.
 
-**Formulação:**
-- **Variáveis de decisão:** quanto volume executar em cada janela de tempo (janelas de 1h)
-- **Função objetivo:** minimizar custo total = Σ (volume alocado na janela × custo estimado da janela)
-- **Restrições:** soma do volume alocado = volume total a executar; possivelmente um teto de volume por janela
+**Formulação (fechada e testada — ver decisões 3, 6, 7, 9 do registro):**
+- **Variáveis de decisão:** `x_i` = número **inteiro** de transações na janela `i` (janelas de 1h)
+- **Função objetivo:** minimizar `Σ x_i × GAS_USED × custo_i`
+- **Restrições:** `Σ x_i = N`; `0 ≤ x_i ≤ teto`, com `teto = max(⌈0,3×N⌉, ⌈N/M⌉)`
 
 **Decisões já tomadas:**
-- **LP contínuo é suficiente** — a alocação por janela é naturalmente uma fração contínua do volume, não há motivo de negócio pra forçar valores inteiros. Isso significa **não** precisamos de Branch and Bound / programação inteira, o que mantém o problema simples e rápido de resolver.
-- Usar biblioteca pronta (`scipy.optimize.linprog`, PuLP, ou OR-Tools) em vez de implementar o simplex do zero — o esforço de vocês deve ir pra formular certo o problema, não pra reinventar o solver.
-- O custo estimado por janela **não** exige modelo preditivo pesado — uma média móvel por hora do dia / dia da semana, calculada em cima da agregação horária (seção 4), já é suficiente como entrada pro LP.
+- **MILP, não LP contínuo** — gas é custo fixo por transação (~21.000 para transferência, ~150.000 para swap), independente do valor movimentado. A variável é contagem de transações, que é inteira por natureza (decisão 3 — revisa a suposição original de LP contínuo).
+- `scipy.optimize.milp` (backend HiGHS), **não** `linprog`, PuLP ou OR-Tools — mantém tudo no ecossistema scipy e resolve em milissegundos com 24 janelas (decisão 9).
+- **Sem** restrição de mínimo por janela ou início forçado — testado via Monte Carlo e **descartado** por piorar mediana e pior caso (decisão 7). Não reintroduzir sem dado novo.
+- O custo por janela vem de **Holt-Winters sazonal + fator de dia da semana** (decisão 8), não de uma média móvel simples — a média móvel foi testada e perdeu.
+- **Horizonte parcial é truncado para baixo:** deadline de 5h30 vira 5 janelas de 1h. Conservador de propósito — nunca recomendar execução após o prazo real.
 
-**Onde roda:** serviço Python separado (FastAPI), endpoint `POST /optimize`, containerizado (Docker), chamado via HTTP síncrono pelo backend Node — o LP resolve em milissegundos, então não há necessidade de fila assíncrona.
+**Onde roda:** serviço Python separado (FastAPI), endpoint `POST /optimize`, containerizado (Docker), chamado via HTTP síncrono pelo backend Node — resolve em milissegundos, então não há necessidade de fila assíncrona.
+
+**O endpoint faz estimativa E otimização.** O Node envia a série histórica horária (vinda de `serie_horaria()` no banco) junto com `N`, `horas_ate_deadline` e `gas_used`; o solver treina o estimador e resolve o MILP numa chamada só. Motivo: o estimador da decisão 8 usa `statsmodels`, que o backend Node não tem como executar. Módulos: `apps/solver/estimador_custo.py` e `apps/solver/otimizador.py`.
 
 ## 8. Backtest histórico
 
@@ -93,17 +108,18 @@ sequenceDiagram
     participant U as Usuário
     participant FE as Frontend
     participant BE as Backend Node.js
-    participant DB as Banco (agregação horária)
-    participant SV as Worker Python (FastAPI)
+    participant DB as Banco (serie_horaria)
+    participant SV as Solver Python (FastAPI)
 
-    U->>FE: Informa volume e deadline
-    FE->>BE: POST /recommend (volume, deadline)
-    BE->>DB: Busca custo estimado por janela (média móvel)
-    BE->>SV: POST /optimize (custos por janela, restrições)
-    SV->>SV: Resolve LP (scipy/PuLP)
-    SV-->>BE: Alocação recomendada por janela
+    U->>FE: Informa nº de transações (N) e deadline
+    FE->>BE: POST /recommend (N, deadline)
+    BE->>DB: serie_horaria(início, fim) — série horária sem buracos
+    BE->>SV: POST /optimize (histórico, N, horas_ate_deadline, gas_used)
+    SV->>SV: Treina estimador (Holt-Winters + fator dia) → custo_i
+    SV->>SV: Resolve MILP (scipy.optimize.milp)
+    SV-->>BE: Plano por janela + custo total + economia vs baseline t=0
     BE-->>FE: Retorna plano de execução
-    FE-->>U: Exibe recomendação (quanto executar, quando)
+    FE-->>U: Exibe recomendação (quantas transações, quando)
 ```
 
 ### 9.3 Backtest histórico (processo offline)
@@ -131,8 +147,8 @@ sequenceDiagram
 ## 10. Serviços (docker-compose)
 
 - `backend-node` — API principal, ingestão via WebSocket, exposição via SSE, orquestra chamadas ao solver
-- `solver-python` — FastAPI, endpoint `/optimize`, roda o LP
-- `db` — armazenamento (bruto por bloco + agregações)
+- `solver-python` — FastAPI, endpoint `/optimize`, estima `custo_i` e roda o MILP
+- `db` — TimescaleDB (Postgres + extensão de séries temporais); schema em `db/init/01_schema.sql`
 - `frontend` — React app (pode rodar fora do compose em dev, servido separadamente em produção)
 
 O job de backtest pode rodar dentro do próprio container `solver-python` como um script invocado manualmente/agendado, sem precisar de um serviço dedicado.

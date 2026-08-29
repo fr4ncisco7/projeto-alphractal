@@ -77,6 +77,13 @@ Em vez de um modelo preditivo isolado, vamos construir um **otimizador de execu�
 - **Função objetivo:** minimizar custo total (soma do volume alocado × custo estimado por janela)
 - **Restrições:** volume total deve ser executado até o deadline; possivelmente um teto por janela
 
+> **⚠️ Desatualizado.** As três decisões abaixo foram revistas depois deste planejamento:
+> a formulação virou **MILP** (decisão 3 — gas é custo fixo por transação, então a variável é
+> contagem, que é inteira), o solver é **`scipy.optimize.milp`** (decisão 9) e o estimador é
+> **Holt-Winters + fator de dia da semana** (decisão 8 — a média móvel foi testada e perdeu).
+> O texto original fica aqui como registro histórico do raciocínio. Fonte da verdade:
+> `docs/registro-decisoes-tecnicas.md`.
+
 **Decisões técnicas já tomadas:**
 - **LP contínuo é suficiente** — não precisamos de Branch and Bound / programação inteira, porque a alocação de volume por janela é naturalmente contínua (não há motivo de negócio para forçar valores inteiros)
 - Usar bibliotecas prontas (`scipy.optimize.linprog`, PuLP, ou OR-Tools) em vez de implementar o algoritmo do zero — o esforço deve ir para a formulação do problema, não para reinventar o solver
