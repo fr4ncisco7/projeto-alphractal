@@ -70,6 +70,25 @@ Para desenvolver sem esperar dado real acumular:
 docker compose exec -T db psql -U alphractal -d fees_monitor < db/seed/dados_sinteticos.sql
 ```
 
+## API
+
+```
+GET  /health      estado do banco, da ingestão e do solver
+POST /otimizar    plano de execução para N transações até um prazo
+```
+
+```bash
+curl -X POST localhost:3000/otimizar -H 'Content-Type: application/json' \
+  -d '{"n_transacoes":50,"horas_ate_deadline":24,"gas_used":21000}'
+```
+
+No lugar de `gas_used` é possível mandar `transacao: {"to":"0x..."}`, e o backend
+estima via `eth_estimateGas`. A resposta traz o plano por janela, a economia contra
+executar tudo agora, e o intervalo de histórico usado.
+
+Responde **503** com um campo `como_resolver` quando não há 48h de histórico no
+banco — que é o caso enquanto o RPC não tiver chave (ver aviso acima).
+
 ## Testes
 
 O solver tem suíte versionada — 62 testes cobrindo o MILP (comparado com força

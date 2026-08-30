@@ -358,6 +358,46 @@ horizontes ≥48h **sem levantar erro nenhum** — o módulo rodava, só entrega
 
 ---
 
+## 2.7. Integração com o backend Node
+
+O `SOLVER_URL` estava no compose desde o esqueleto, mas nenhum arquivo em `src/` o
+usava — o solver existia e ninguém o chamava. O `POST /otimizar` fecha isso.
+
+| Componente | Escolha | Para quê |
+| --- | --- | --- |
+| Transporte | `fetch` nativo do Node 20 | Sem dependência nova; `AbortSignal.timeout` cobre o solver travado |
+| Leitura da série | `serie_horaria()` no Postgres | Gapfill e interpolação já resolvidos no banco (decisão 14) |
+| `GAS_USED` | número pronto **ou** `eth_estimateGas` | Aceita quem já tem o valor e quem quer estimar pela transação |
+| Validação | manual, sem biblioteca | 4 campos; zod seria dependência maior que o problema |
+
+**Quem lê o banco é o Node.** O solver continua stateless e sem credencial de banco:
+recebe a série no corpo do pedido. É o que permite os 62 testes rodarem sem subir
+Postgres.
+
+**Dois status para duas falhas diferentes.** Entrada malformada é 422; histórico
+insuficiente no banco é 503 — não é erro de quem chamou, é estado do sistema, e é a
+resposta que mais vai aparecer enquanto não houver chave de RPC. Por isso o corpo do
+503 traz `como_resolver`, em vez de só constatar o problema.
+
+```
+POST /otimizar
+{ "n_transacoes": 50, "horas_ate_deadline": 24, "gas_used": 21000 }
+->
+{ "plano": [...], "economia_pct": 28.16, "n_janelas": 24, "teto_por_janela": 15,
+  "historico_horas": 672, "historico_de": "...", "historico_ate": "..." }
+```
+
+| Verificação ponta a ponta | Resultado |
+| --- | --- |
+| Caminho feliz, 5 semanas de seed | 672h contíguas, plano soma exatamente N, **90ms** |
+| Buraco de 3h no seed | preenchido pelo gapfill; série volta contígua |
+| Estimativa via `eth_estimateGas` | funciona contra a mainnet |
+| Histórico insuficiente (3,4h reais) | 503 com `como_resolver` |
+| Solver fora do ar | 503; o `/health` passa a marcar `solver: "inalcancavel"` |
+| Entradas inválidas | 5 casos, todos 422 com mensagem específica |
+
+---
+
 # 3. Infraestrutura e Execução
 
 ## 3.1. Stack tecnológica
@@ -407,7 +447,8 @@ apps/backend-node/
 │   ├── rpc.ts                   # cliente viem, feeHistory e interpolação de timestamp
 │   ├── ingestao.ts              # assinatura newHeads (ao vivo)
 │   ├── backfill.ts              # recuperação de histórico em lote (CLI)
-│   └── index.ts                 # servidor Express e bootstrap da ingestão
+│   ├── solver.ts                # cliente HTTP do serviço de solver
+│   └── index.ts                 # Express: /health, /otimizar, bootstrap da ingestão
 ├── Dockerfile
 ├── package.json
 └── tsconfig.json
@@ -524,7 +565,7 @@ calendário precisam. Pode começar imediatamente, em paralelo ao resto.
 
 ## 4.2. Entrega em tempo real (SSE)
 
-**Status:** não iniciado. O `index.ts` tem apenas o health check.
+**Status:** não iniciado. O `index.ts` já tem `/health` e `/otimizar` (seção 2.7); falta o streaming.
 
 | Componente | Escolha | Para quê |
 | --- | --- | --- |
@@ -592,8 +633,10 @@ Trocar por dado real é a mudança.
 - **Teto desejado:** piso + otimizador integrado ao painel + backtest com número quantificado
 
 O otimizador dockerizado e funcional era meta de semana 2 do roadmap, e já está
-pronto e verificado — a frente matematicamente arriscada está resolvida antes do
-kickoff.
+pronto, testado e **integrado ao backend** — a frente matematicamente arriscada está
+resolvida antes do kickoff. Na prática isso significa que o frontend tem um endpoint
+real para consumir (`POST /otimizar`) desde já, sem esperar mais nada do lado do
+solver.
 
 ---
 

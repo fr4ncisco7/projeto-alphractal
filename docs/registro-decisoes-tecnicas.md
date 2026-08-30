@@ -316,6 +316,40 @@ Junto disso, dois ajustes: as versões em `requirements.txt` foram **pinadas** (
 
 ---
 
+## 22. Integração backend Node → solver: `POST /otimizar`
+
+O `SOLVER_URL` estava no compose desde o esqueleto, mas nenhum arquivo em `src/` o usava — o solver existia e ninguém o chamava. O endpoint `POST /otimizar` fecha isso: lê a série horária do banco, chama o `/optimize` do solver e devolve o plano. Quem consome não precisa saber que existe um serviço Python atrás.
+
+**Quem lê o banco é o Node, não o solver.** O solver continua stateless e sem credencial de banco (decisão 12): recebe a série no corpo do pedido. Mantém as credenciais num serviço só e deixa o solver testável sem infraestrutura — foi o que permitiu os 62 testes da decisão 20 rodarem sem subir Postgres.
+
+**Dois status diferentes para duas falhas diferentes.** Entrada malformada é **422**; histórico insuficiente no banco é **503**. A distinção importa: histórico curto não é erro de quem chamou, é estado do sistema — e é a resposta que mais vai aparecer enquanto não houver chave de RPC (decisão 18). Por isso o corpo do 503 traz um campo `como_resolver` dizendo o que fazer, em vez de só constatar o problema.
+
+**A série sai do relógio do banco, não do Node.** O limite superior é `date_trunc('hour', now())` calculado em SQL. Dois motivos: exclui a hora em curso, que seria a média de uma hora pela metade — mais ruidosa que as demais bem no ponto em que o Holt-Winters mais pesa; e evita divergência de alguns segundos entre os relógios dos containers, à qual o balde de 1h é sensível.
+
+**Filtrar `NULL` da série é seguro** porque `serie_horaria()` já aplica `interpolate()`: buraco no meio vem preenchido, e o que sobra `NULL` são só as bordas, antes do primeiro bloco e depois do último. Verificado com o seed, que tem um buraco proposital de 3h — as 672 horas voltaram contíguas.
+
+**`GAS_USED` aceita dois caminhos:** o número pronto, para quem já o tem, ou um objeto `transacao` que o backend estima via `eth_estimateGas`. Ambos verificados contra a mainnet.
+
+**Nomenclatura:** o endpoint público é `/otimizar` (português, pela convenção do projeto), o interno do solver segue `/optimize`, como já estava na arquitetura e na decisão 15. A inconsistência é consciente — o `/optimize` é fronteira interna entre serviços, não a API do produto.
+
+**Verificado ponta a ponta** com as 5 semanas do seed: 672h de histórico contíguo, plano de 50 transações em 24 janelas somando exatamente 50, 28,16% de economia contra o baseline t=0, resposta em **90ms**. Os caminhos de 422 (5 casos), o 503 de histórico insuficiente e o 503 de solver fora do ar foram todos exercitados.
+
+---
+
+## 23. Dois defeitos que o modo de desenvolvimento escondia
+
+Ambos apareceram só ao integrar, e a causa é a mesma: o caminho de dev não exercita o que produção exercita.
+
+**a) `npm run build` estava quebrado.** O `buscarFeeHistory` montava `{ blockNumber, blockTag }` com um dos dois `undefined`, mas o tipo do viem é uma **união** — as duas chaves não podem coexistir no objeto, nem com valor `undefined`. O `npm run dev` usa `tsx`, que transpila sem checar tipos, então o erro nunca apareceu. Corrigido escolhendo o objeto inteiro conforme o caso, em vez de montar um objeto com chaves condicionais.
+
+**b) O `express.json()` nunca foi montado.** Não fazia falta enquanto só havia rotas GET. O primeiro POST chegaria com `req.body` indefinido e falharia de um jeito difícil de ler.
+
+**c) Não havia lockfile no backend.** O `Dockerfile` rodava `npm install` a partir do `package.json` apenas, então cada build resolvia as versões de novo — o mesmo problema que o pin do `requirements.txt` resolveu no solver (decisão 21). Agora o `package-lock.json` é versionado e a imagem usa `npm ci`, que instala exatamente o que está travado e falha se o lock divergir do `package.json`.
+
+Junto com o `Dockerfile` da decisão 21, são três defeitos da mesma família: **o ambiente de desenvolvimento é mais permissivo que o de produção, então passar em dev não é evidência de nada.** Vale como argumento para ligar CI cedo — um `tsc --noEmit` em push teria pego o (a) no dia em que entrou.
+
+---
+
 ## Pendências em aberto
 
 - Fórmula do índice engenheirado de gas (análogo ao CVDD)
