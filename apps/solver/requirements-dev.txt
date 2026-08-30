@@ -1,0 +1,5 @@
+# Dependencias so' de teste -- deliberadamente fora da imagem de producao.
+# Instalar com: pip install -r requirements.txt -r requirements-dev.txt
+-r requirements.txt
+pytest==8.4.2
+httpx==0.28.1
