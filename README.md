@@ -115,6 +115,8 @@ scripts/             utilitários de desenvolvimento
 
 ## Documentação
 
+- [`docs/como-rodar.md`](docs/como-rodar.md) — **guia completo de execução**: o que cada
+  serviço faz, como verificar, os dados, e os problemas conhecidos
 - [`docs/estado-do-projeto.md`](docs/estado-do-projeto.md) — **o que está pronto, o que
   falta e como faremos**, com a stack de cada frente e os resultados medidos
 - [`docs/planejamento-projeto.md`](docs/planejamento-projeto.md) — escopo, roadmap, riscos
