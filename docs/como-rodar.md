@@ -189,10 +189,24 @@ docker compose exec -T db psql -U alphractal -d fees_monitor \
 > hypertable: o Timescale devolve um aviso e um **arquivo vazio, sem erro** — um backup
 > ingênuo dá falso positivo.
 
-Aí sim:
+```bash
+./scripts/semear.sh
+```
+
+O script faz as duas travas que o `.sql` sozinho não tem como fazer: pede confirmação se
+houver dado a perder, e **desliga a ingestão ao vivo** antes de semear.
+
+> **Por que isso importa.** As duas fontes produzem cerca de **300 blocos por hora cada**
+> (um bloco a cada 12s). Depois de uma hora rodando lado a lado, o balde da hora corrente
+> fica meio a meio, e seu preço médio vira uma média entre ~12 gwei do sintético e ~1,3 gwei
+> do real. É justamente o balde mais recente o que mais pesa no Holt-Winters, então a
+> previsão sai errada sem nada quebrar visivelmente. Medido: 4 blocos reais entre 204
+> sintéticos após 45 segundos.
+
+Para voltar a acumular dado real depois, comece de um banco limpo — não por cima do seed:
 
 ```bash
-docker compose exec -T db psql -U alphractal -d fees_monitor < db/seed/dados_sinteticos.sql
+./scripts/reset-db.sh && docker compose up -d
 ```
 
 Para restaurar o backup depois:

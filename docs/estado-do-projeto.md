@@ -491,6 +491,7 @@ db/
 
 scripts/
 ├── reset-db.sh                  # destrói o volume e reaplica o schema
+├── semear.sh                    # carrega o dado sintético, com as travas
 └── testar-solver.sh             # roda os 62 testes num container
 ```
 

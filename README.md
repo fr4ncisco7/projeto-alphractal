@@ -64,11 +64,15 @@ com o volume vazio:
 ./scripts/reset-db.sh          # destrói o banco e reaplica o schema
 ```
 
-Para desenvolver sem esperar dado real acumular:
+Para desenvolver sem esperar dado real acumular, 5 semanas de dado sintético:
 
 ```bash
-docker compose exec -T db psql -U alphractal -d fees_monitor < db/seed/dados_sinteticos.sql
+./scripts/semear.sh
 ```
+
+O script pede confirmação se houver dado a perder e **desliga a ingestão ao vivo** antes
+de semear — bloco real e bloco sintético na mesma tabela corrompem a série sem que nada
+quebre visivelmente. Ver `docs/como-rodar.md` §6.
 
 ## API
 
