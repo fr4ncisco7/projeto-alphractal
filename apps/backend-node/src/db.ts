@@ -73,3 +73,41 @@ export async function ultimoBlocoGravado(): Promise<number | null> {
   const r = await pool.query<{ n: string | null }>("SELECT max(block_number)::text AS n FROM bloco_gas");
   return r.rows[0]?.n ? Number(r.rows[0].n) : null;
 }
+
+/** Um ponto da série horária, no formato que o solver espera. */
+export interface PontoHorario {
+  momento: Date;
+  precoGwei: number;
+}
+
+/**
+ * Série horária contígua terminando na última hora COMPLETA.
+ *
+ * Três detalhes que a query resolve e que não são óbvios:
+ *
+ * 1. `date_trunc('hour', now())` como limite superior exclui a hora em curso.
+ *    Sem isso o último ponto seria a média de uma hora pela metade -- mais
+ *    ruidoso que os demais, bem no ponto onde o Holt-Winters mais pesa.
+ *
+ * 2. `serie_horaria()` já aplica gapfill com `interpolate()`, então buraco no
+ *    MEIO da série vem preenchido. O que sobra NULL são só as bordas, antes do
+ *    primeiro bloco e depois do último -- e é por isso que filtrar NULL aqui
+ *    devolve um intervalo contíguo, não um queijo suíço.
+ *
+ * 3. As bordas saem do relógio do BANCO, não do Node. Os dois containers
+ *    podem divergir alguns segundos, e o balde de 1h é sensível a isso.
+ */
+export async function serieHoraria(horas: number): Promise<PontoHorario[]> {
+  const r = await pool.query<{ momento: Date; preco_gwei: number }>(
+    `WITH bordas AS (
+       SELECT date_trunc('hour', now()) AS fim,
+              date_trunc('hour', now()) - ($1::int * INTERVAL '1 hour') AS inicio
+     )
+     SELECT s.momento, s.preco_gwei
+     FROM bordas, serie_horaria(bordas.inicio, bordas.fim) s
+     WHERE s.preco_gwei IS NOT NULL
+     ORDER BY s.momento`,
+    [horas],
+  );
+  return r.rows.map((l) => ({ momento: l.momento, precoGwei: Number(l.preco_gwei) }));
+}
