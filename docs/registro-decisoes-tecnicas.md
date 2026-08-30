@@ -288,9 +288,38 @@ Duas correções feitas ao validar a ingestão contra a mainnet, ambas achadas p
 
 ---
 
+## 20. Testes do solver: suíte `pytest` versionada e imagem de teste separada
+
+Até aqui as verificações do solver eram scripts de medição rodados à mão e descartados. Isso foi suficiente para *descobrir* a inversão da etapa 2 (decisão 17), mas não impede que ela volte — e é justamente o tipo de bug que não levanta exceção: o módulo roda, só entrega número errado. A suíte agora mora em `apps/solver/tests/` e é rodada por `./scripts/testar-solver.sh`.
+
+**Três escolhas que valem registro:**
+
+**a) O teste do MILP compara com força bruta, não com valor esperado fixo.** Em instâncias pequenas (M ≤ 5, N ≤ 12) o ótimo é enumerável, então o teste calcula o ótimo exato e exige igualdade. Um valor cravado à mão só testaria que o resultado não mudou; a força bruta testa que ele está *certo*.
+
+**b) O estimador é comparado com a razão REALIZADA no dado, não com o parâmetro nominal.** O gerador sintético injeta fator 0,55 de fim de semana, mas a reversão à média e o ruído deslocam o que de fato aparece na série (0,551–0,557 nas sementes testadas). Cobrar 0,55 exato seria cobrar do estimador algo que o dado não contém. O helper `razao_realizada()` mede o alvo diretamente da série gerada.
+
+**c) O teste de regressão da decisão 17 reimplementa a ordem antiga.** Em vez de só verificar que a ordem atual acerta, ele executa as duas e exige que a atual seja ao menos 10× mais precisa. Medido com semente 0: o alvo realizado na série é 0,5565; a ordem atual recupera 0,5582 (**erro de 0,32%**) e a ordem antiga recupera 0,9884 (**erro de 77,6%**) — ou seja, ela conclui que praticamente *não existe* efeito de dia da semana. O alpha ajustado do Holt-Winters nessa série é 0,752, alto o bastante para o nível perseguir a queda de fim de semana e não sobrar nada dela no resíduo. A margem real entre as duas ordens é de ~240×; o teste cobra 10× para não ficar frágil a semente. Se alguém reinverter as etapas, quebra aqui com mensagem dizendo o quê.
+
+**A suíte foi validada por mutação**, não só por passar: inverter a ordem das etapas derruba 9 testes, trocar o teto de 30% por 100% derruba 7, e truncar o horizonte para cima em vez de para baixo derruba 3. Suíte que passa mas não falha quando o código quebra não protege nada.
+
+**Imagem de teste separada da de produção.** `pytest` e `httpx` ficam em `requirements-dev.txt`; a imagem que a Alphractal executa não os contém. O script de teste constrói uma imagem própria e traz o código por bind mount, para editar teste não exigir rebuild.
+
+---
+
+## 21. O `Dockerfile` do solver copiava os módulos um a um — e um ficou de fora
+
+`COPY main.py estimador_custo.py ./` não incluía `otimizador.py`. A imagem subia normalmente em desenvolvimento **porque o compose monta `./apps/solver:/app` por cima**, e o bind mount repunha o arquivo faltante. Rodando a imagem sozinha — que é exatamente como ela rodaria em produção — `import main` falhava com `ModuleNotFoundError: No module named 'otimizador'`.
+
+Corrigido com `COPY *.py ./`. A lição não é sobre esse arquivo específico: **listar módulo a módulo cria uma lista que precisa ser mantida em sincronia com o diretório**, e o bind mount de dev garante que ninguém perceba quando ela sai de sincronia. Vale para qualquer serviço do projeto.
+
+Junto disso, dois ajustes: as versões em `requirements.txt` foram **pinadas** (`pandas 3.0.5`, `numpy 2.4.6`, `scipy 1.17.1`, `statsmodels 0.15.0` — majors recentes, build de hoje não é build da demo), e o `--reload` saiu do `CMD` da imagem para o `command:` do compose, já que reload é característica de desenvolvimento, não da imagem entregue.
+
+---
+
 ## Pendências em aberto
 
 - Fórmula do índice engenheirado de gas (análogo ao CVDD)
 - **Obter chave Alchemy/Infura** — sem ela o backfill trava em 3,4h (ver decisão 18)
 - Recalibrar teto (decisão 6) com dado histórico real assim que capturado
 - Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado sintético
+- Testes do backend Node e CI — o solver tem suíte (decisão 20), o Node ainda não, e nada roda automaticamente em push
