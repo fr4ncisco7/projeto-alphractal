@@ -25,12 +25,13 @@ export interface FeeHistory {
 }
 
 export async function buscarFeeHistory(blocos: number, ateBloco: bigint | "latest"): Promise<FeeHistory> {
-  const r = await clienteHttp.getFeeHistory({
-    blockCount: blocos,
-    blockNumber: ateBloco === "latest" ? undefined : ateBloco,
-    blockTag: ateBloco === "latest" ? "latest" : undefined,
-    rewardPercentiles: [...PERCENTIS],
-  });
+  // O tipo do viem é uma união: ou `blockNumber`, ou `blockTag` -- as duas
+  // chaves não podem coexistir no objeto, nem mesmo com valor undefined.
+  const r = await clienteHttp.getFeeHistory(
+    ateBloco === "latest"
+      ? { blockCount: blocos, blockTag: "latest", rewardPercentiles: [...PERCENTIS] }
+      : { blockCount: blocos, blockNumber: ateBloco, rewardPercentiles: [...PERCENTIS] },
+  );
   return {
     oldestBlock: r.oldestBlock,
     baseFeePerGas: r.baseFeePerGas,
