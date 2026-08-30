@@ -18,13 +18,21 @@ services:
 
   solver-python:
     build: ./apps/solver
+    # Sem isto o container roda como root e tudo que ele escreve no diretório
+    # montado (ex: __pycache__) vira arquivo root na máquina do dev, que não
+    # consegue nem apagar sem sudo.
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "8000:8000"
     volumes:
       - ./apps/solver:/app
+    # A imagem roda sem --reload (e' o comando de producao). Aqui em dev o
+    # bind mount acima torna o reload util, entao sobrescrevemos.
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   backend-node:
     build: ./apps/backend-node
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "3000:3000"
     volumes:

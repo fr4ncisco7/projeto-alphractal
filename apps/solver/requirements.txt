@@ -1,6 +1,8 @@
-fastapi
-uvicorn[standard]
-scipy
-pandas
-numpy
-statsmodels
+# Versoes pinadas: pandas 3.x e numpy 2.x sao majors recentes com quebras de API.
+# Sem pin, a imagem da demo pode nao ser a imagem testada.
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+scipy==1.17.1
+pandas==3.0.5
+numpy==2.4.6
+statsmodels==0.15.0
