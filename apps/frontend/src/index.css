@@ -1,0 +1,92 @@
+:root {
+  --ink-900: #02040a;
+  --ink-800: #04070d;
+  --ink-700: #070c16;
+  --ink-600: #0b1220;
+
+  --blue-700: #0b2f7a;
+  --blue-600: #1a4fd6;
+  --blue-500: #2f7cf6;
+  --blue-400: #4da2ff;
+  --blue-300: #86c6ff;
+
+  --text-100: #f4f8ff;
+  --text-300: #c2cfe2;
+  --text-500: #8698b0;
+  --text-600: #6b7c93;
+
+  --field-bg: rgba(9, 16, 28, 0.72);
+  --field-border: rgba(140, 175, 225, 0.16);
+  --hairline: rgba(150, 185, 235, 0.14);
+
+  --radius-field: 10px;
+  --radius-btn: 12px;
+
+  --font-display: "Outfit", "Segoe UI", sans-serif;
+  --font-body: "Instrument Sans", "Segoe UI", sans-serif;
+
+  --shell-max: 1440px;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--ink-900);
+  color: var(--text-100);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue-400);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--blue-600);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

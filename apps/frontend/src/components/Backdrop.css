@@ -1,0 +1,250 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.backdrop > * {
+  position: absolute;
+  inset: 0;
+}
+
+/* Gradientes com paradas intermediárias: a queda suave evita as faixas
+   (banding) que aparecem em degradês escuros de tela cheia. */
+.backdrop__base {
+  background:
+    radial-gradient(
+      58% 46% at -2% 114%,
+      rgba(158, 224, 255, 0.4) 0%,
+      rgba(92, 172, 253, 0.3) 20%,
+      rgba(46, 110, 216, 0.19) 44%,
+      rgba(22, 58, 134, 0.09) 66%,
+      transparent 84%
+    ),
+    radial-gradient(
+      122% 96% at 6% 108%,
+      rgba(38, 102, 220, 0.42) 0%,
+      rgba(26, 74, 176, 0.24) 28%,
+      rgba(15, 45, 116, 0.11) 54%,
+      transparent 78%
+    ),
+    radial-gradient(
+      86% 66% at 98% -12%,
+      rgba(112, 184, 255, 0.3) 0%,
+      rgba(50, 116, 218, 0.17) 32%,
+      rgba(18, 52, 126, 0.08) 56%,
+      transparent 78%
+    ),
+    radial-gradient(
+      46% 62% at 80% 48%,
+      rgba(30, 78, 176, 0.15) 0%,
+      rgba(18, 48, 116, 0.07) 45%,
+      transparent 74%
+    ),
+    radial-gradient(
+      64% 52% at 82% 96%,
+      rgba(46, 60, 152, 0.16) 0%,
+      rgba(26, 36, 100, 0.07) 46%,
+      transparent 76%
+    ),
+    radial-gradient(
+      74% 58% at 50% 44%,
+      rgba(3, 8, 20, 0.52) 0%,
+      rgba(3, 8, 20, 0.24) 44%,
+      transparent 72%
+    ),
+    linear-gradient(
+      168deg,
+      #09121f 0%,
+      #060c18 26%,
+      #030711 52%,
+      #02050c 76%,
+      #01030a 100%
+    );
+}
+
+.backdrop__aurora {
+  filter: blur(105px);
+  opacity: 0.52;
+  will-change: transform;
+}
+
+.backdrop__aurora--left {
+  inset: auto -10% -45% -30%;
+  height: 82%;
+  background: radial-gradient(
+    circle at 40% 60%,
+    rgba(40, 106, 226, 0.55),
+    rgba(26, 74, 176, 0.22) 42%,
+    transparent 66%
+  );
+  opacity: 0.58;
+  animation: drift-a 26s ease-in-out infinite alternate;
+}
+
+/* Núcleo mais claro dentro do brilho inferior: dá temperatura ao azul. */
+.backdrop__aurora--accent {
+  inset: auto 48% -34% -18%;
+  height: 54%;
+  background: radial-gradient(
+    circle at 45% 68%,
+    rgba(160, 226, 255, 0.42),
+    rgba(84, 164, 250, 0.16) 44%,
+    transparent 68%
+  );
+  filter: blur(115px);
+  opacity: 0.72;
+  animation: drift-c 34s ease-in-out infinite alternate;
+}
+
+.backdrop__aurora--right {
+  inset: -30% -20% auto 45%;
+  height: 85%;
+  background: radial-gradient(
+    circle at 65% 40%,
+    rgba(84, 158, 244, 0.32),
+    rgba(30, 80, 180, 0.12) 45%,
+    transparent 68%
+  );
+  animation: drift-b 32s ease-in-out infinite alternate;
+}
+
+.backdrop__aurora--top {
+  inset: 14% 16% 18% 14%;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(8, 24, 66, 0.6),
+    rgba(6, 18, 50, 0.28) 48%,
+    transparent 74%
+  );
+  filter: blur(130px);
+  opacity: 0.8;
+  animation: pulse 18s ease-in-out infinite alternate;
+}
+
+.backdrop__grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+}
+
+.backdrop__vignette {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.38) 0%, transparent 32%),
+    radial-gradient(
+      105% 105% at 50% 40%,
+      transparent 42%,
+      rgba(0, 0, 0, 0.28) 72%,
+      rgba(0, 0, 0, 0.55) 100%
+    );
+}
+
+/* Dentro do app o conteúdo ocupa a tela toda, então o brilho fica na borda
+   direita para não competir com a leitura. */
+
+.backdrop--app .backdrop__base {
+  background:
+    radial-gradient(
+      42% 48% at 104% 50%,
+      rgba(120, 198, 255, 0.24) 0%,
+      rgba(60, 136, 240, 0.16) 26%,
+      rgba(28, 78, 176, 0.09) 52%,
+      transparent 78%
+    ),
+    radial-gradient(
+      72% 86% at 102% 54%,
+      rgba(33, 100, 214, 0.3) 0%,
+      rgba(20, 62, 150, 0.16) 32%,
+      rgba(12, 38, 96, 0.07) 58%,
+      transparent 80%
+    ),
+    radial-gradient(
+      56% 56% at 6% 106%,
+      rgba(26, 74, 172, 0.18) 0%,
+      rgba(14, 44, 110, 0.08) 44%,
+      transparent 74%
+    ),
+    linear-gradient(
+      146deg,
+      #070d1a 0%,
+      #04080f 30%,
+      #02050b 62%,
+      #010206 100%
+    );
+}
+
+.backdrop--app .backdrop__aurora--left {
+  display: none;
+}
+
+.backdrop--app .backdrop__aurora--accent {
+  inset: 20% -8% 20% 78%;
+  height: auto;
+  background: radial-gradient(
+    circle at 60% 50%,
+    rgba(132, 210, 255, 0.26),
+    transparent 64%
+  );
+}
+
+.backdrop--app .backdrop__aurora--right {
+  inset: -15% -25% -15% 45%;
+  height: auto;
+  background: radial-gradient(
+    circle at 78% 50%,
+    rgba(38, 108, 224, 0.44),
+    rgba(22, 66, 158, 0.16) 44%,
+    transparent 68%
+  );
+}
+
+.backdrop--app .backdrop__aurora--top {
+  opacity: 0.5;
+}
+
+.backdrop--app .backdrop__vignette {
+  background: radial-gradient(
+    125% 105% at 28% 50%,
+    transparent 30%,
+    rgba(0, 0, 0, 0.34) 70%,
+    rgba(0, 0, 0, 0.66) 100%
+  );
+}
+
+@keyframes drift-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(7%, -6%, 0) scale(1.12);
+  }
+}
+
+@keyframes drift-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  to {
+    transform: translate3d(-8%, 8%, 0) scale(0.95);
+  }
+}
+
+@keyframes drift-c {
+  from {
+    transform: translate3d(-4%, 4%, 0) scale(0.94);
+  }
+  to {
+    transform: translate3d(6%, -8%, 0) scale(1.14);
+  }
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0.9;
+  }
+}
