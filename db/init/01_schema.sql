@@ -107,6 +107,15 @@ SELECT add_continuous_aggregate_policy('gas_1h',
     end_offset        => INTERVAL '1 hour',
     schedule_interval => INTERVAL '10 minutes');
 
+-- Agregação em tempo real: a consulta passa a unir o que já foi materializado
+-- com os blocos crus do balde ainda aberto. Sem isto o gas_1min só devolve o
+-- minuto anterior (o end_offset acima deixa o balde corrente de fora, e a
+-- política só roda a cada 1 min) -- até ~2 min de atraso, inaceitável num
+-- gráfico que se diz "tempo real". O custo é a consulta unir duas fontes;
+-- irrelevante nas janelas curtas que o painel lê.
+ALTER MATERIALIZED VIEW gas_1min SET (timescaledb.materialized_only = false);
+ALTER MATERIALIZED VIEW gas_1h   SET (timescaledb.materialized_only = false);
+
 -- ---------------------------------------------------------------------------
 -- Série horária para o estimador
 -- ---------------------------------------------------------------------------

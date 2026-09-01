@@ -1,4 +1,5 @@
 import { gravarBlocos, type LinhaBloco } from "./db.js";
+import { publicar } from "./eventos.js";
 import { PERCENTIS, buscarFeeHistory, clienteWs } from "./rpc.js";
 
 /**
@@ -38,6 +39,21 @@ export function iniciarIngestaoAoVivo(): () => void {
 
         const n = await gravarBlocos([linha]);
         blocosGravados += n;
+
+        // Publica só o que foi de fato gravado: bloco duplicado (n === 0) não
+        // vira evento, senão o painel desenharia o mesmo ponto duas vezes na
+        // sobreposição entre backfill e ingestão ao vivo.
+        if (n > 0) {
+          const priority = BigInt(linha.priorityFeeP50Wei);
+          const base = BigInt(linha.baseFeeWei);
+          publicar({
+            momento: linha.momento.toISOString(),
+            block_number: linha.blockNumber,
+            preco_gwei: Number(base + priority) / 1e9,
+            base_fee_gwei: Number(base) / 1e9,
+            gas_used_ratio: linha.gasUsedRatio,
+          });
+        }
         if (blocosGravados % 25 === 1) {
           const gwei = Number(bloco.baseFeePerGas) / 1e9;
           console.log(`[ingestao] bloco ${bloco.number} base_fee=${gwei.toFixed(4)} gwei ` +
