@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Configuração local: aponta para o backend desta máquina.
+# O .env.example documenta as variáveis.
+.env

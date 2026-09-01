@@ -219,3 +219,25 @@
     background-position: -20% 0;
   }
 }
+
+/* Contêiner do gráfico. A altura é fixada aqui e no createChart -- o
+   lightweight-charts desenha em canvas e precisa de altura em pixels, não
+   herda a do pai. */
+.grafico {
+  width: 100%;
+  height: 320px;
+}
+
+/* Heatmap do calendário. Altura cresce com o número de dias, mas 24 colunas
+   sempre cabem na largura do painel. */
+.calendario {
+  width: 100%;
+  height: 300px;
+}
+
+.calendario__nota {
+  margin: 0.6rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--text-600);
+}

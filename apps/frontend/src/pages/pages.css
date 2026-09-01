@@ -64,9 +64,16 @@
   list-style: none;
 }
 
+/* Linha de lista.
+   Era um grid de 5 colunas fixas, dimensionado para a lista de ativos do shell
+   (ticker | nome | barra | valor | tag). As telas de gas usam combinações
+   diferentes -- às vezes só rótulo e valor, às vezes hora, barra, valor e nota
+   -- e nesse grid rígido os elementos caíam em colunas de largura errada e
+   apareciam truncados com reticências.
+   Agora é flex: cada elemento declara o próprio comportamento, e a linha
+   funciona com dois ou com cinco filhos. */
 .row {
-  display: grid;
-  grid-template-columns: 3.25rem minmax(5rem, 13rem) minmax(4rem, 1fr) 2.75rem 4.5rem;
+  display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 0.5rem;
@@ -80,12 +87,17 @@
 }
 
 .row__ticker {
+  flex: 0 0 3.5rem;
   font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
+/* Rótulo ou nota. Cresce para ocupar o espaço livre e empurra o valor para a
+   direita; só corta com reticências quando não couber mesmo. */
 .row__name {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -93,6 +105,8 @@
 }
 
 .row__meter {
+  flex: 1 1 6rem;
+  min-width: 3rem;
   height: 4px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.07);
@@ -106,10 +120,24 @@
   background: linear-gradient(90deg, var(--blue-600), var(--blue-400));
 }
 
+/* Números alinham à direita e nunca quebram: é o dado que se lê na varredura
+   vertical da lista. */
 .row__value {
+  flex: 0 0 auto;
+  margin-left: auto;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  white-space: nowrap;
   color: var(--text-300);
+}
+
+/* Quando há valor E nota depois dele, a nota não deve empurrar o valor para
+   longe -- o margin-left:auto acima já encostou o valor na direita, então a
+   nota que vem em seguida fica colada nele. */
+.row__value + .row__name {
+  flex: 0 0 auto;
+  margin-left: 0;
+  text-align: right;
 }
 
 .tag {
@@ -153,4 +181,98 @@
   .row__meter {
     display: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Formulário do otimizador
+   Usa os mesmos tokens do resto do shell (--field-bg, --hairline, --radius-*)
+   para o formulário não parecer colado de outro projeto.
+--------------------------------------------------------------------------- */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.campo__rotulo {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-300);
+}
+
+.campo__entrada {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-field);
+  background: var(--field-bg);
+  color: var(--text-100);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  /* Números alinham em coluna e não dançam ao digitar. */
+  font-variant-numeric: tabular-nums;
+}
+
+.campo__entrada:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.campo__ajuda {
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-600);
+}
+
+/* Unidade ao lado do número: presente mas sem competir com o valor. */
+.metric__unit {
+  font-size: 0.55em;
+  font-weight: 500;
+  color: var(--text-500);
+}
+
+/* Erro do formulário. O statebox--error é do ResourceState, que não cobre
+   submissão manual -- este é o equivalente para o POST do otimizador. */
+.statebox__error {
+  margin-top: 0.9rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(255, 128, 128, 0.28);
+  border-radius: var(--radius-field);
+  background: rgba(90, 20, 24, 0.28);
+  color: #ffc9c4;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+/* O botão do formulário. As definições de .btn e .btn--light vivem em
+   LoginPage.css, que só é carregado na tela de login -- então precisam existir
+   aqui também, senão o botão do otimizador sai sem estilo nenhum. Mantidas
+   idênticas de propósito: se divergirem, o mesmo botão fica diferente em duas
+   telas. Candidatas a subir para ui.css num momento de faxina. */
+.stack > .btn {
+  align-self: flex-start;
+  min-height: 2.95rem;
+  padding: 0.7rem 1.6rem;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: box-shadow 0.25s ease, background 0.25s ease, opacity 0.2s ease;
+}
+
+.stack > .btn--light {
+  background: linear-gradient(180deg, #ffffff, #e9eef7);
+  color: #060a12;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 16px 34px -20px rgba(140, 190, 255, 0.85);
+}
+
+.stack > .btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
 }
