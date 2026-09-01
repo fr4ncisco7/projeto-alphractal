@@ -350,10 +350,73 @@ Junto com o `Dockerfile` da decisão 21, são três defeitos da mesma família: 
 
 ---
 
+## 24. Rotas do painel e entrega em tempo real por SSE
+
+O backend expunha só `/health` e `/otimizar`. Para o painel funcionar faltavam as leituras e o streaming.
+
+**As leituras saem das agregações contínuas, não da hypertable.** `gas_1min` alimenta o gráfico ao vivo, `gas_1h` o calendário. Varrer `bloco_gas` a cada requisição seria varrer centenas de milhares de linhas para desenhar algumas dezenas de pontos.
+
+**Agregação em tempo real precisou ser ligada.** As duas views nasceram com `materialized_only = true`, e a política de refresh tem `end_offset` de 1 minuto — ou seja, o balde corrente ficava de fora e o `gas_1min` devolvia no máximo o minuto anterior. Até ~2 minutos de atraso num gráfico que se diz tempo real. Com `materialized_only = false` a consulta une o materializado com os blocos do balde ainda aberto. O custo é unir duas fontes; irrelevante nas janelas curtas do painel.
+
+**SSE, não WebSocket** (já previsto no TAP, agora implementado): o tráfego é unidirecional, e o `EventSource` do navegador reconecta sozinho. WebSocket seria bidirecional sem ninguém usando a volta.
+
+**O barramento de eventos é em memória e isolado** (`eventos.ts`). A ingestão não sabe que HTTP existe; o `/stream` não sabe de onde veio o bloco. Um processo Node atende todas as conexões e todos recebem o mesmo evento — não há estado por usuário, fila ou entrega garantida a implementar. Com mais de uma instância do backend seria preciso um pub/sub externo; hoje seria complexidade sem uso.
+
+**Publica só o que foi gravado.** Bloco duplicado (`gravarBlocos` devolve 0) não vira evento — senão o painel desenharia o mesmo ponto duas vezes na sobreposição entre backfill e ingestão ao vivo.
+
+**CORS escrito à mão**, seis linhas, sem adicionar o pacote `cors`. O `*` serve enquanto a API é pública e sem autenticação; com login por cookie ou token isso precisa virar lista de origens, porque `*` é incompatível com credenciais.
+
+**A moda usa histograma adaptativo, não balde fixo.** A primeira versão agrupava em baldes de 0,1 gwei. Com a mainnet perto de 0,06 gwei todos os blocos caíam no mesmo balde e a moda saía **0,1 — maior que o máximo observado (0,089)**, um valor inexistente na série. O mesmo balde fixo seria fino demais numa época de gas a 80 gwei. Agora são 40 faixas entre o mínimo e o máximo do dia, devolvendo o centro da mais populosa: funciona nas duas escalas sem constante para sintonizar.
+
+---
+
+## 25. Trava contra histórico defasado no `/otimizar`
+
+O solver prevê a partir da hora **seguinte** ao último ponto do histórico. Se a série estiver velha, a "janela 0" do plano cai no passado e a recomendação é para um período que já terminou — devolvida com **status 200 e nenhum sinal do problema**.
+
+Não é hipótese: aconteceu depois de uma noite com a máquina desligada. O dado sintético terminava em 31/08 00:03, a ingestão só voltou em 01/09 00:24, e o `/otimizar` respondeu 200 com um plano cuja primeira janela era 31/08 01:00 — 24 horas no passado.
+
+O backend agora compara o fim da série com o relógio e responde **503** acima do limite, com `por_que`, `como_resolver`, `serie_ate` e `defasagem_horas` no corpo. Mesma filosofia do 503 de histórico insuficiente: erro silencioso vira erro visível.
+
+**O limite é 3h, e o número não é folga arbitrária.** A série termina na última hora *cheia*, então às 10h59 o último ponto é o das 09h00 — 1h59 de idade mesmo com ingestão perfeita. Um limite de 2h dispararia falso positivo todo fim de hora. 3h dá uma hora de margem real.
+
+O `/health` também passou a expor `defasagem_minutos` do último bloco, para o problema ser visível antes de alguém chamar o otimizador.
+
+---
+
+## 26. Gráficos: duas bibliotecas, carregadas sob demanda
+
+**Duas bibliotecas, e não por inconsistência.** `lightweight-charts` desenha em canvas e foi feito para série financeira com streaming: `update()` mexe só no último ponto, sem redesenhar a série a cada bloco. Mas ele não tem heatmap de calendário — é especializado em série temporal. O ECharts tem, e é o formato que o parceiro pediu. Cada uma cobre o que a outra não faz.
+
+**Import dinâmico foi necessário, não enfeite.** Somadas, as duas levaram o bundle de 260 kB para **939 kB** (310 kB comprimidos). Com `React.lazy`, o principal voltou a 261 kB e os gráficos viraram pedaços separados — 167 kB o de linha, 510 kB o heatmap — carregados só por quem abre a tela que desenha. A tela de login não paga nada.
+
+O import do ECharts já era modular (`echarts/core` + heatmap, grid, tooltip, visualMap, canvas). Os 510 kB são o custo real desse conjunto; o pacote inteiro passa de 1 MB.
+
+**A escala de cor do heatmap corta nos percentis 5 e 95, não no mínimo e máximo.** Com escala linear entre os extremos, o gas revelou o problema na primeira renderização: um único pico de 2,41 gwei consumiu toda a faixa de cor e as outras ~160 células viraram o mesmo azul-escuro. O heatmap ficava bonito e não informava nada. Cortando no percentil 95 (1,14 gwei), a variação do dia a dia recupera a faixa; valores acima saturam na cor do topo, que é a leitura correta — "isto foi caro". Uma nota abaixo do gráfico informa o corte e o pico real, para o dado não ser escondido.
+
+**O gráfico ao vivo junta duas fontes.** O histórico vem do `/gas/recente` (série de 1 min); os pontos novos vêm do `/stream` por `EventSource`. O `update()` do lightweight-charts substitui o ponto quando o timestamp é igual ao último e adiciona quando é maior — exatamente o comportamento desejado, já que vários blocos caem no mesmo minuto. Blocos com timestamp anterior ao último desenhado são descartados.
+
+**Sem `VITE_API_URL` o stream é simulado** a cada 12 s, o mesmo ritmo da rede. Assim a interface pode ser demonstrada sem Docker, com o gráfico se movendo de verdade.
+
+---
+
+## 27. Três defeitos que só apareceram com a interface rodando
+
+Nenhum deles aparece em teste de unidade, em `tsc` ou em `curl`. Todos exigiram abrir o navegador.
+
+**a) O CORS bloqueava toda chamada.** A lista `Access-Control-Allow-Headers` tinha só `Content-Type`, mas o frontend manda `Authorization: Bearer` da sessão em toda requisição. Um cabeçalho não listado faz o preflight falhar e o navegador nem envia a requisição real. Invisível no `curl`, que não faz preflight sem ser mandado.
+
+**b) A tela de login despejava HTML de erro no formulário.** Com a API real configurada, o `POST /auth/login` batia num backend sem autenticação e o `Cannot POST /auth/login` do Express aparecia cru dentro do campo. Corrigido em duas frentes: as rotas `/auth/` vão sempre para o backend simulado (o Fees Monitor não tem login; a tela é a casca do shell da plataforma), e o `api.ts` deixou de exibir resposta que comece com `<`.
+
+**c) As listas truncavam texto com reticências.** O `.row` era um grid de 5 colunas fixas, dimensionado para a lista de ativos do shell original (ticker, nome, barra, valor, tag). As telas de gas usam combinações diferentes, então os elementos caíam em colunas de largura errada: `0,0816 gwei/gas` virava `0,081…` e "Ingestão ao vivo" virava "Ingest…". Trocado por flex, onde cada elemento declara o próprio comportamento e a linha funciona com dois ou cinco filhos.
+
+---
+
 ## Pendências em aberto
 
 - Fórmula do índice engenheirado de gas (análogo ao CVDD)
 - **Obter chave Alchemy/Infura** — sem ela o backfill trava em 3,4h (ver decisão 18)
 - Recalibrar teto (decisão 6) com dado histórico real assim que capturado
 - Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado sintético
+- **Modos de dado incompatíveis:** sintético (9-28 gwei) e real (~0,06 gwei) diferem ~200x e não podem coexistir na mesma série. Hoje a separação é operacional (`semear.sh` desliga a ingestão); falta decidir se vira coluna de origem no schema
 - Testes do backend Node e CI — o solver tem suíte (decisão 20), o Node ainda não, e nada roda automaticamente em push

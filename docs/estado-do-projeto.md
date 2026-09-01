@@ -547,7 +547,7 @@ são o que transforma "fizemos um otimizador" em prova quantificada de valor.
 
 ## 4.1. Frontend do painel
 
-**Status:** não iniciado. É a maior lacuna.
+**Status:** shell da plataforma integrado, com as três telas no domínio de gas, gráfico ao vivo (lightweight-charts) e heatmap do calendário (ECharts). Falta o índice engenheirado (seção 4.3).
 
 | Componente | Escolha | Para quê |
 | --- | --- | --- |
@@ -566,7 +566,7 @@ calendário precisam. Pode começar imediatamente, em paralelo ao resto.
 
 ## 4.2. Entrega em tempo real (SSE)
 
-**Status:** não iniciado. O `index.ts` já tem `/health` e `/otimizar` (seção 2.7); falta o streaming.
+**Status:** concluído. `GET /stream` no backend, `EventSource` no painel, alimentando o gráfico ao vivo sem recarregar.
 
 | Componente | Escolha | Para quê |
 | --- | --- | --- |
