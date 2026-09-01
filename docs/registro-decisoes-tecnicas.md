@@ -412,6 +412,28 @@ Nenhum deles aparece em teste de unidade, em `tsc` ou em `curl`. Todos exigiram 
 
 ---
 
+## 28. Conversão para dólar na exibição
+
+O objetivo formal do TAP é "converter dados brutos da blockchain (gas) em indicadores financeiros instantâneos (USD)", e a decisão 4 já previa a conversão só na camada de exibição. O painel estava mostrando tudo em gwei — a conversão faltava.
+
+**gwei não converte direto para dólar.** É preço POR UNIDADE de gas, não um valor: "0,089 gwei" não tem equivalente em dinheiro sem multiplicar pelo gas consumido. Isso obriga a escolher uma **transação de referência** para os cartões de estatística, e a escolha foi 21.000 — o custo fixo de uma transferência simples de ETH, o menor possível e o mais reconhecível. O número exibido é portanto um piso: uma swap consome ~150.000. A referência aparece na própria tela, para ninguém ler como "custo médio de uma transação".
+
+No otimizador não há essa ambiguidade: `custo_total_gwei` já é um total (Σ xᵢ × gas_used × custoᵢ), então converte direto. A **economia em dólar** virou o número principal da tela, com o percentual como legenda — é o que decide, e é o que a Alphractal vai olhar.
+
+**A cotação sai da chave que já existe.** A URL do RPC da Alchemy contém a chave, e a mesma chave serve na Prices API deles — evita pedir uma segunda credencial. Com outro provedor (Infura, nó próprio) o padrão não casa e o código cai no CoinGecko, que é público e sem chave. As duas fontes foram conferidas entre si: US$ 2.462,07 contra 2.460,91, 0,05% de diferença.
+
+**Cache de 60 s, com compartilhamento de requisições em voo.** Gas muda a cada 12 s, o preço do ETH não tanto. E como três rotas do painel pedem cotação ao mesmo tempo, sem o compartilhamento seriam três chamadas externas idênticas a cada carregamento de tela.
+
+**Cotação indisponível não derruba nada.** Os campos em dólar vêm `null` e a interface mostra gwei; se houver cotação anterior em cache, ela é mantida em vez de sumir — um preço de minutos atrás é melhor que nenhum. O painel de gas é a função principal e não pode depender de uma API de preço.
+
+**No heatmap, a conversão é aplicada aos VALORES, não só ao texto do tooltip.** Como gwei → dólar é multiplicação por constante, a escala de cor sai idêntica — as mesmas células nas mesmas cores — e a legenda e o tooltip passam a falar em dinheiro sem código de formatação especial dentro do gráfico.
+
+**Precisão fixa em coluna, adaptativa em cartão.** A precisão por magnitude de `usd()` é certa num cartão isolado e errada numa lista de valores comparáveis: `US$ 0,017` ao lado de `US$ 0,00682` e `US$ 0,043` deixa a coluna irregular e destrói a comparação visual, que é para o que a lista existe. Em listas, `casasParaColuna()` deriva as casas do menor valor e vale para todos.
+
+**A cotação não entra no modelo.** Continua valendo a decisão 4: multiplicar a função objetivo por uma constante não muda o argmin, então a alocação ótima é a mesma em ETH ou em USD. O módulo `cotacao.ts` não é chamado pelo solver.
+
+---
+
 ## Pendências em aberto
 
 - Fórmula do índice engenheirado de gas (análogo ao CVDD)

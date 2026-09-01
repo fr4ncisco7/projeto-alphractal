@@ -77,9 +77,20 @@ quebre visivelmente. Ver `docs/como-rodar.md` §6.
 ## API
 
 ```
-GET  /health      estado do banco, da ingestão e do solver
-POST /otimizar    plano de execução para N transações até um prazo
+GET  /health              estado do banco, da ingestão, do solver e nº de conexões SSE
+GET  /gas/recente         série de 1 min para o gráfico ao vivo   ?minutos=180
+GET  /gas/estatisticas    média, mediana e moda do dia (+ custo em USD)
+GET  /cotacao             ETH/USD, com a fonte e o instante
+GET  /gas/calendario      agregado horário para o heatmap         ?dias=7
+GET  /stream              Server-Sent Events, um evento por bloco novo
+POST /otimizar            plano de execução para N transações até um prazo
 ```
+
+Todas as rotas respondem com CORS liberado (`*`), para o frontend em `localhost:5173`
+poder chamar o backend em `localhost:3000` durante o desenvolvimento.
+
+O `/stream` só emite com `INGESTAO_ATIVA=true` — sem ingestão não há bloco novo, e a
+conexão fica aberta em silêncio. O primeiro comentário enviado avisa em qual modo está.
 
 ```bash
 curl -X POST localhost:3000/otimizar -H 'Content-Type: application/json' \
