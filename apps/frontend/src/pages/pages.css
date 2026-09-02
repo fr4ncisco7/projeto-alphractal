@@ -710,3 +710,10 @@
   border-top: 1px dashed rgba(150, 185, 235, 0.5);
   border-radius: 0;
 }
+
+/* "Execute agora" é texto, não número: não pode herdar o corpo de 2,8rem
+   pensado para um percentual de quatro caracteres. */
+.resumo__valor--agora {
+  font-size: clamp(1.4rem, 2.8vw, 1.8rem);
+  color: var(--text-100);
+}

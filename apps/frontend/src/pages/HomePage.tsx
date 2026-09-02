@@ -295,11 +295,14 @@ function usePlanoVitrine() {
 function PlanoVitrine({ plano, erro, carregando }: {
   plano: Otimizacao | null; erro: string | null; carregando: boolean;
 }) {
-  const titulo = "Se você tivesse 50 transferências para fazer hoje";
+  const titulo = `Se você tivesse ${PEDIDO_VITRINE.n_transacoes} transferências para fazer hoje`;
+  // Derivado do pedido, e não escrito à mão: mexer na constante sem mexer
+  // no texto deixaria o painel descrevendo um prazo que não foi pedido.
+  const dica = `Distribuídas nas próximas ${PEDIDO_VITRINE.horas_ate_deadline} h pelo otimizador`;
 
   if (carregando) {
     return (
-      <Panel title={titulo} hint="Distribuídas nas próximas 24 h pelo otimizador">
+      <Panel title={titulo} hint={dica}>
         <div className="skeleton"><div className="skeleton__row" /></div>
       </Panel>
     );
@@ -307,7 +310,7 @@ function PlanoVitrine({ plano, erro, carregando }: {
 
   if (erro || !plano) {
     return (
-      <Panel title={titulo} hint="Distribuídas nas próximas 24 h pelo otimizador">
+      <Panel title={titulo} hint={dica}>
         <p className="statebox statebox--error" role="status">{erro}</p>
       </Panel>
     );
@@ -319,22 +322,43 @@ function PlanoVitrine({ plano, erro, carregando }: {
   return (
     <Panel
       title={titulo}
-      hint="Distribuídas nas próximas 24 h pelo otimizador"
+      hint={dica}
       actions={<Link className="statebox__retry" to="/predicoes">Abrir otimizador</Link>}
     >
       <div className="resumo">
+        {/* Economia negativa NÃO é economia: é o quanto o plano custaria a MAIS
+            que executar tudo agora. Mostrar o módulo dela ao lado de "a hora
+            atual já é a melhor" fazia uma penalidade de 133% parecer um ganho
+            de 133%. Quando o número é negativo a manchete passa a ser a
+            recomendação -- que é a saída real do modelo -- e o percentual desce
+            para nota, com o sinal e o sentido escritos. */}
         <div className="resumo__numero">
-          <p className={`resumo__valor resumo__valor--${positiva ? "bom" : "neutro"}`}>
-            {percentual(Math.abs(plano.economia_pct), 1)}
-          </p>
-          <p className="resumo__legenda">
-            {positiva ? "mais barato que executar tudo agora" : "a hora atual já é a melhor prevista"}
-          </p>
-          {plano.economia_usd !== null && positiva && (
-            <p className="resumo__nota">
-              {usd(plano.custo_total_usd)} contra {usd(plano.custo_baseline_t0_usd)} —
-              economia de {usd(plano.economia_usd)}
-            </p>
+          {positiva ? (
+            <>
+              <p className="resumo__valor resumo__valor--bom">
+                {percentual(plano.economia_pct, 1)}
+              </p>
+              <p className="resumo__legenda">mais barato que executar tudo agora</p>
+              {plano.economia_usd !== null && (
+                <p className="resumo__nota">
+                  {usd(plano.custo_total_usd)} contra {usd(plano.custo_baseline_t0_usd)} —
+                  economia de {usd(plano.economia_usd)}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="resumo__valor resumo__valor--agora">Execute agora</p>
+              <p className="resumo__legenda">
+                A hora atual já é a mais barata prevista no prazo.
+              </p>
+              <p className="resumo__nota">
+                Distribuir custaria {percentual(Math.abs(plano.economia_pct), 1)} a mais
+                ({usd(plano.custo_total_usd)} contra {usd(plano.custo_baseline_t0_usd)}):
+                o teto de {plano.teto_por_janela} transações por janela impede concentrar
+                tudo numa hora só.
+              </p>
+            </>
           )}
         </div>
 

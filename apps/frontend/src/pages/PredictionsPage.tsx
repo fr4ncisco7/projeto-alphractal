@@ -107,20 +107,27 @@ export function PredictionsPage() {
           {resultado && (
             <>
               <Panel
-                title="Economia"
+                title={resultado.economia_pct > 0 ? "Economia" : "Executar agora sai mais barato"}
                 hint={`Comparado a executar as ${resultado.plano.reduce((t, j) => t + j.x, 0)} transações agora`}
               >
                 <div className="grid grid--metrics">
                   <article className="metric">
-                    <p className="metric__label">Economia</p>
+                    {/* O rótulo acompanha o sinal: "Economia: -US$ 0,39" obriga
+                        o leitor a decifrar que o negativo inverte o sentido da
+                        palavra. Com o valor negativo isto não é economia
+                        nenhuma -- é o custo extra de distribuir. */}
+                    <p className="metric__label">
+                      {resultado.economia_pct > 0 ? "Economia" : "Custo extra de distribuir"}
+                    </p>
                     {/* Dólar em cima do percentual: é o número que decide. */}
                     <p className="metric__value">
                       {resultado.economia_usd !== null
-                        ? usd(resultado.economia_usd)
-                        : percentual(resultado.economia_pct, 2)}
+                        ? usd(Math.abs(resultado.economia_usd))
+                        : percentual(Math.abs(resultado.economia_pct), 2)}
                     </p>
                     <p className="metric__hint">
-                      {resultado.economia_usd !== null && `${percentual(resultado.economia_pct, 2)} · `}
+                      {resultado.economia_usd !== null &&
+                        `${percentual(Math.abs(resultado.economia_pct), 2)} · `}
                       {resultado.economia_pct > 0
                         ? "custo evitado ao distribuir a execução"
                         : "a hora atual já é a mais barata prevista — o modelo está dizendo para executar agora"}
