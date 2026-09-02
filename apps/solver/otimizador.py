@@ -13,6 +13,11 @@ Deliberadamente AUSENTE: minimo por janela / inicio forcado. Foi testado via
 Monte Carlo e piorou mediana (+0,45%) e pior caso (+28,0%) -- decisao 7. Nao
 reintroduzir sem dado novo.
 
+Sobre a formulacao ha' uma TRAVA DE DOMINANCIA (decisao 31): se o plano
+distribuido custar mais que executar tudo agora, o resultado devolvido e' o
+baseline. Nao e' parte do MILP -- e' uma comparacao final entre duas solucoes
+viaveis, que impede o servico de recomendar algo pior que nao usa-lo.
+
 Custos ficam em gwei o tempo todo; conversao para USD e' responsabilidade da
 camada de exibicao (decisao 4).
 """
@@ -31,7 +36,10 @@ class ResultadoOtimizacao:
     custo_total_gwei: float
     teto: int
     custo_baseline_t0_gwei: float   # decisao 10: baseline "tudo de uma vez em t=0"
-    economia_pct: float
+    economia_pct: float             # nunca negativa: ver trava de dominancia
+    executar_agora: bool            # True quando a trava trocou o plano pelo baseline
+    custo_distribuido_gwei: float   # o que o plano do MILP custaria; util quando
+                                    # executar_agora, para dizer o quanto seria pior
 
 
 def calcular_teto(n_transacoes: int, n_janelas: int) -> int:
@@ -96,9 +104,45 @@ def otimizar(custo_i, n_transacoes: int, gas_used: int,
     # HiGHS devolve float mesmo com integrality=1; arredondar e' seguro aqui.
     x = np.round(resultado.x).astype(int)
 
-    custo_total = float(c @ x)
+    custo_distribuido = float(c @ x)
     custo_baseline = float(n_transacoes * gas_used * custo_i[0])
-    economia = 100.0 * (1 - custo_total / custo_baseline) if custo_baseline > 0 else 0.0
+
+    # ------------------------------------------------------------------
+    # Trava de dominancia (decisao 31)
+    # ------------------------------------------------------------------
+    # O MILP nao tem a opcao de "nao fazer nada": sum(x_i) = N com x_i <= teto
+    # o PROIBE de concentrar as N transacoes numa janela so' sempre que
+    # teto < N. Quando a janela 0 e' a mais barata do horizonte -- comum em
+    # prazo curto -- ele e' obrigado a espalhar para janelas piores, e o plano
+    # sai mais caro que simplesmente executar tudo agora.
+    #
+    # Medido na mainnet em 02/09/2026 com N=50: prazos de 2h a 20h davam
+    # economia entre -178% e -32%. Um servico que recomenda o pior dos dois
+    # caminhos disponiveis nao pode ir para producao assim.
+    #
+    # A comparacao e' entre duas solucoes VIAVEIS do mesmo problema (o plano do
+    # MILP e o vetor "tudo em t=0"), entao devolver a melhor nao afrouxa
+    # restricao nenhuma. O teto continua valendo para o plano distribuido; o
+    # baseline nao o viola porque nao e' uma escolha do otimizador, e' o que o
+    # usuario faria sem ele -- e concentrar AGORA nao carrega risco de previsao,
+    # que e' justamente o que o teto existe para conter (decisao 6).
+    # Tolerancia relativa para o EMPATE nao virar dominancia. Com uma janela so'
+    # -- ou quando o MILP escolhe exatamente o baseline -- os dois custos sao a
+    # mesma conta em ordem de associacao diferente (`(g*c) @ x` contra
+    # `n*g*c[0]`), e a diferenca de arredondamento decidia o sinalizador. Empate
+    # nao e' o plano perdendo: e' o plano sendo o baseline.
+    executar_agora = custo_distribuido > custo_baseline * (1 + 1e-9)
+    if executar_agora:
+        x = np.zeros(n_janelas, dtype=int)
+        x[0] = n_transacoes
+        custo_total = custo_baseline
+    else:
+        custo_total = custo_distribuido
+
+    # max(0, ...) nao esconde economia negativa de verdade: depois da trava ela
+    # nao existe mais. O que sobra e' o -0,000000001% do empate, que chegava na
+    # tela como "-0,00%" -- um sinal de menos sem significado nenhum.
+    economia = max(0.0, 100.0 * (1 - custo_total / custo_baseline)) if custo_baseline > 0 else 0.0
 
     return ResultadoOtimizacao(
         x=x,
@@ -106,4 +150,6 @@ def otimizar(custo_i, n_transacoes: int, gas_used: int,
         teto=teto,
         custo_baseline_t0_gwei=custo_baseline,
         economia_pct=economia,
+        executar_agora=executar_agora,
+        custo_distribuido_gwei=custo_distribuido,
     )

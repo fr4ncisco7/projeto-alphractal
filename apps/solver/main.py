@@ -58,6 +58,8 @@ class RespostaOtimizacao(BaseModel):
     custo_total_gwei: float
     custo_baseline_t0_gwei: float
     economia_pct: float
+    executar_agora: bool
+    custo_distribuido_gwei: float
     teto_por_janela: int
     n_janelas: int
     aviso: str | None = None
@@ -136,6 +138,8 @@ def optimize(pedido: PedidoOtimizacao):
         custo_total_gwei=resultado.custo_total_gwei,
         custo_baseline_t0_gwei=resultado.custo_baseline_t0_gwei,
         economia_pct=resultado.economia_pct,
+        executar_agora=resultado.executar_agora,
+        custo_distribuido_gwei=resultado.custo_distribuido_gwei,
         teto_por_janela=resultado.teto,
         n_janelas=n_janelas,
         aviso=aviso,

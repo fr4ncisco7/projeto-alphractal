@@ -102,11 +102,59 @@ def test_baseline_e_tudo_em_t0():
     assert r.economia_pct > 0
 
 
-def test_economia_negativa_quando_t0_e_o_melhor_momento():
-    """Se t=0 ja' e' o mais barato, o teto forca parte para janelas piores e a
-    economia fica negativa. E' o comportamento correto, nao um bug."""
+# --- trava de dominancia (decisao 31) ---
+
+def test_quando_t0_e_o_melhor_a_trava_devolve_o_baseline():
+    """Se t=0 ja' e' o mais barato, o teto forca parte das transacoes para
+    janelas piores e o plano do MILP sai mais caro que executar tudo agora.
+    A trava troca esse plano pelo baseline em vez de recomenda-lo."""
     r = otimizar([0.10, 0.50, 0.60, 0.70], 10, GAS_USED)
-    assert r.economia_pct < 0
+
+    assert r.executar_agora is True
+    # Plano devolvido: tudo na janela 0, ignorando o teto -- concentrar AGORA
+    # nao tem risco de previsao, que e' o que o teto contem (decisao 6).
+    assert list(r.x) == [10, 0, 0, 0]
+    assert r.custo_total_gwei == pytest.approx(r.custo_baseline_t0_gwei)
+    assert r.economia_pct == pytest.approx(0.0)
+    # O custo do plano descartado continua exposto, para a interface poder
+    # dizer o quanto distribuir seria pior.
+    assert r.custo_distribuido_gwei > r.custo_baseline_t0_gwei
+
+
+def test_trava_nao_dispara_quando_distribuir_compensa():
+    r = otimizar([0.40, 0.10, 0.10, 0.10], 10, GAS_USED)
+    assert r.executar_agora is False
+    assert r.custo_total_gwei == pytest.approx(r.custo_distribuido_gwei)
+    assert r.economia_pct > 0
+
+
+@pytest.mark.parametrize("custo_i", [
+    [0.10, 0.50, 0.60, 0.70],        # t0 e' o unico barato
+    [0.40, 0.10, 0.10, 0.10],        # distribuir compensa
+    [0.25, 0.25, 0.25, 0.25],        # tudo igual
+    [0.10, 0.11, 0.90, 0.95, 0.99],  # t0 barato, um vizinho quase igual
+    [0.30, 0.29],                    # dois passos, diferenca minima
+    [0.1150],                        # uma janela: plano E' o baseline (empate)
+    [0.0],                           # janela 0 de graca: baseline custa zero
+])
+@pytest.mark.parametrize("n", [1, 7, 10, 50])
+def test_economia_nunca_e_negativa(custo_i, n):
+    """A garantia que a trava existe para dar: usar o otimizador nunca pode
+    sair pior que nao usa-lo."""
+    r = otimizar(custo_i, n, GAS_USED)
+    # Estritamente >= 0, sem approx: era exatamente o -1e-14 do empate que
+    # chegava na interface formatado como "-0,00%".
+    assert r.economia_pct >= 0.0
+    assert r.custo_total_gwei <= r.custo_baseline_t0_gwei + 1e-9
+
+
+def test_com_uma_janela_o_plano_e_o_baseline():
+    """Horizonte de uma hora: nao ha' o que distribuir, e a economia e' zero
+    sem a trava precisar disparar."""
+    r = otimizar([0.42], 10, GAS_USED)
+    assert list(r.x) == [10]
+    assert r.economia_pct == pytest.approx(0.0)
+    assert r.executar_agora is False
 
 
 # --- caminhos de erro ---
