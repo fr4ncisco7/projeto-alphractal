@@ -825,6 +825,33 @@ sai do `/gas/calendario` que a tela de Análise já consome, e o alinhamento ent
 de `historico_ate` — a janela `i` cobre `historico_ate + (i+1)h`, porque o estimador prevê a
 partir da hora seguinte ao fim do histórico.
 
+## 38. Barra lateral: ícones e modo recolhido
+
+Ícones nas três rotas e um botão que recolhe a barra para 76 px, mostrando só os ícones.
+
+**Ícones desenhados à mão, não um pacote.** São quatro traçados SVG; uma biblioteca de
+ícones inteira pesaria mais que eles. Todos com o mesmo `viewBox`, traço e espessura, para
+alinharem na coluna. A escolha de cada um segue o que a tela faz, não a metáfora genérica:
+pulso para a tela ao vivo, barras para a Análise, controles deslizantes para o Solver.
+
+**O rótulo some da tela, não da acessibilidade.** Com a barra recolhida cada item mantém
+`aria-label` (leitor de tela) e ganha `title` (mouse). Trocar o texto por ícone sem isso
+deixaria a navegação inutilizável para quem depende de leitor.
+
+**O texto encolhe em vez de sumir.** `width: 0` + `opacity: 0` com transição, e não
+`display: none`: assim ele acompanha a barra durante os 220 ms em vez de piscar fora no
+primeiro quadro. A transição vive na coluna do grid, para a barra e o conteúdo se moverem
+juntos e o conteúdo não "pular" depois dela.
+
+**A preferência fica em `localStorage`** — quem recolheu espera encontrar recolhido, e não há
+nada aqui que justifique ida ao servidor. Leitura e escrita em try/catch, como no histórico
+de execuções (decisão 36).
+
+**Recolher não existe na barra horizontal** (≤900 px, quando ela vai para o topo): ali a
+largura não é o recurso escasso. O botão some e a barra volta ao estado expandido mesmo se a
+preferência salva disser o contrário — senão o modo estreito herdaria um estado que não faz
+sentido nele.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e

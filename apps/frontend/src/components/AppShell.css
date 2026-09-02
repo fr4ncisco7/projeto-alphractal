@@ -1,11 +1,25 @@
 .app {
   --sidebar-width: 268px;
+  /* Largura recolhida: o ícone de 20px mais o respiro que mantém o alvo de
+     clique confortável e o item ativo com a mesma cara de quando há texto. */
+  --sidebar-recolhida: 76px;
 
   position: relative;
   min-height: 100%;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   isolation: isolate;
+}
+
+.app--recolhida {
+  --sidebar-width: var(--sidebar-recolhida);
+}
+
+/* A transição fica na coluna do grid, não em cada elemento: a barra e o
+   conteúdo se movem juntos, sem o conteúdo "pulando" depois dela. */
+.app,
+.sidebar {
+  transition: grid-template-columns 0.22s ease, padding 0.22s ease;
 }
 
 /* ---------- sidebar ---------- */
@@ -46,6 +60,9 @@
 
 .navlink {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
   padding: 0.8rem 0.95rem;
   border-radius: 11px;
   font-family: var(--font-display);
@@ -81,9 +98,90 @@
   transform: translateY(-50%);
 }
 
+.navlink__icone {
+  display: grid;
+  place-items: center;
+  flex: 0 0 20px;
+  color: var(--text-600);
+  transition: color 0.2s ease;
+}
+
+.navlink:hover .navlink__icone { color: var(--text-300); }
+.navlink--active .navlink__icone { color: var(--blue-400); }
+
+.navlink__texto {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .sidebar__footer {
   margin-top: auto;
   padding-top: 1.5rem;
+}
+
+/* ---------- botão de recolher ---------- */
+
+.recolher {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: 11px;
+  font-size: 0.82rem;
+  color: var(--text-600);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.recolher:hover {
+  color: var(--text-300);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.recolher__seta {
+  display: grid;
+  place-items: center;
+  flex: 0 0 20px;
+  transition: transform 0.22s ease;
+}
+
+/* ---------- estado recolhido ---------- */
+
+.app--recolhida .sidebar {
+  padding-left: 0.7rem;
+  padding-right: 0.7rem;
+  align-items: center;
+}
+
+/* O texto sai do fluxo em vez de virar `display: none`: assim ele encolhe
+   junto com a barra em vez de desaparecer de uma vez no meio da transição. */
+.app--recolhida .navlink__texto {
+  width: 0;
+  opacity: 0;
+  transition: width 0.22s ease, opacity 0.12s ease;
+}
+
+.app--recolhida .navlink,
+.app--recolhida .recolher {
+  justify-content: center;
+  gap: 0;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+/* A marca do item ativo encostaria na borda da barra estreita. */
+.app--recolhida .navlink--active::before {
+  left: -0.45rem;
+}
+
+.app--recolhida .modulo {
+  display: none;
+}
+
+/* A seta gira para apontar o sentido da ação, não o estado atual. */
+.app--recolhida .recolher__seta {
+  transform: rotate(180deg);
 }
 
 /* Rodapé da barra: identifica o módulo, não um usuário. Sem login não há
@@ -182,5 +280,25 @@
      do módulo ao lado dele só rouba largura da navegação. */
   .modulo {
     display: none;
+  }
+
+  /* Recolher só faz sentido numa barra em coluna: no topo, a largura não é o
+     recurso escasso. O botão sai, e a barra volta ao estado expandido mesmo se
+     a preferência salva disser o contrário. */
+  .recolher {
+    display: none;
+  }
+
+  .app--recolhida {
+    --sidebar-width: auto;
+  }
+
+  .app--recolhida .navlink__texto {
+    width: auto;
+    opacity: 1;
+  }
+
+  .app--recolhida .navlink {
+    gap: 0.7rem;
   }
 }
