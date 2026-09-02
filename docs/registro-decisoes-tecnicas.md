@@ -434,11 +434,68 @@ No otimizador não há essa ambiguidade: `custo_total_gwei` já é um total (Σ 
 
 ---
 
+## 29. Índice da tela de Análise: consistência do padrão, não congestão
+
+O painel reservava um espaço para um "índice de congestão" engenheirado, análogo ao CVDD.
+A frente foi encerrada sem fórmula, e o espaço precisava de um índice que valesse a tela.
+
+**Congestão medida por ocupação de bloco foi descartada por medição, não por gosto.**
+`gas_used_ratio` fica entre 0,499 e 0,517 nas 24 horas do dia, enquanto o preço varia 9×
+no mesmo período:
+
+| hora (UTC) | gas_used_ratio | preço médio |
+|---|---|---|
+| 02 | 0,5084 | 0,0937 gwei |
+| 16 | 0,5069 | 0,8415 gwei |
+
+Isso é o EIP-1559 funcionando como projetado: o base fee sobe justamente para manter os
+blocos perto do alvo de 50% de ocupação. Nas horas caras a rede não fica mais cheia — fica
+mais cara. Um índice de ocupação seria uma linha reta em 50 atravessando a tela.
+
+**O índice adotado é a consistência de cada hora entre os dias.** O resto da página afirma
+"a hora mais barata é a Xh"; sozinha, a frase é uma armadilha com 4 a 5 dias de amostra,
+porque uma hora barata na média pode ser cara em três dias e baratíssima num quarto. O
+índice responde se o padrão se repete, que é o que decide se dá para agendar em cima dele.
+
+```
+consistência(h) = 100 / (1 + CV(h)),  CV(h) = desvio padrão amostral / média
+```
+
+Transformação limitada e monótona: CV = 0 (a hora custa o mesmo todo dia) dá 100; CV = 1
+(o desvio tem o tamanho da própria média) dá 50, que é a leitura natural de "metade do
+valor é ruído". O índice da tela é a **mediana** das 24 horas, não a média — uma única hora
+dominada por um pico isolado puxaria a média e faria o padrão inteiro parecer pior.
+
+Horas com menos de dois dias de amostra devolvem `null`, não 100: afirmar consistência
+perfeita a partir de uma observação seria o pior erro possível para este número.
+
+Na amostra atual o índice dá 62, com as horas indo de 36 a 76 — e as extremas são
+justamente as de pico. A figura cruza duas variáveis: altura = consistência, cor = acima ou
+abaixo da mediana de preço, com marca tracejada nos 50 pontos. Sem a marca as barras leem
+como um bloco uniforme, porque na prática vivem entre 35 e 80; truncar o eixo resolveria o
+contraste mentindo sobre a escala.
+
+O cálculo é do cliente, sobre a série horária que a tela já carrega — não vale rota nova
+para algumas centenas de pontos já agregados pelo banco.
+
 ## Pendências em aberto
 
-- Fórmula do índice engenheirado de gas (análogo ao CVDD)
-- **Obter chave Alchemy/Infura** — sem ela o backfill trava em 3,4h (ver decisão 18)
-- Recalibrar teto (decisão 6) com dado histórico real assim que capturado
-- Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado sintético
-- **Modos de dado incompatíveis:** sintético (9-28 gwei) e real (~0,06 gwei) diferem ~200x e não podem coexistir na mesma série. Hoje a separação é operacional (`semear.sh` desliga a ingestão); falta decidir se vira coluna de origem no schema
-- Testes do backend Node e CI — o solver tem suíte (decisão 20), o Node ainda não, e nada roda automaticamente em push
+- ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
+  **substituído** pelo índice de consistência do padrão horário (decisão 29). A
+  `docs/estado-do-projeto.md` pedia "índice engenheirado" no piso mínimo; o que foi entregue
+  é um índice diferente do previsto, com fórmula fechada e defensável — vale dizer isso na
+  demo em vez de deixar parecer que o item saiu igual ao planejado
+- **Backtest histórico** — não existe (`apps/solver/backtest*` ausente). É o "teto desejado" da
+  definição de pronto e é o que produz o número quantificado de economia para a apresentação
+- Recalibrar teto (decisão 6) com dado histórico real
+- Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado
+  sintético; hoje há ~95h de mainnet capturadas, suficiente para o fator de dia da semana ficar
+  fraco (menos de 1 semana completa) mas já dá para checar a sazonalidade de 24h
+- Testes do backend Node e CI — o solver tem suíte (decisão 20), o Node ainda não, e nada roda
+  automaticamente em push
+
+### Resolvidas
+
+- ~~Obter chave Alchemy/Infura~~ — obtida em 31/08; backfill de 93,4h executado (decisão 26)
+- ~~Modos de dado incompatíveis (sintético vs real)~~ — o banco passou a conter só dado real de
+  mainnet; o seed sintético segue disponível para dev, mas não convive mais com a série de produção
