@@ -627,23 +627,46 @@ sob as mesmas restrições) e `uniforme`.
 | 12h | +0,0% | −48,0% | +26,6% | −73,7% | 43% | 33/49 |
 | 24h | **+20,4%** | **−601,1%** | +50,1% | −65,4% | **76%** | 28/49 |
 
-**A mediana defende o produto: +20,4% em 24h, capturando 76% do que a previsão perfeita
-conseguiria.** E a formulação bate o ingênuo com folga em todos os cortes — distribuir de
-qualquer jeito perde de 24% a 74%, então o ganho vem do MILP, não de espalhar.
+**A mediana de +20,4% em 24h é uma miragem, e quase entrou na apresentação como resultado.**
+No **agregado** — economia sobre a soma dos custos de todas as origens — o otimizador com o
+teto atual gasta **32,9% a mais** que executar tudo imediatamente. O caso típico ganha; o
+total perde, porque as perdas são muito maiores em magnitude que os ganhos. A mediana era a
+métrica errada: com a trava de dominância, mais da metade das origens devolve exatamente 0% e
+a mediana fica presa nesse zero enquanto as demais ganham ou perdem muito.
 
-**A cauda o condena: p25 de −601%,** e em apenas 28 de 49 origens seguir o plano não piorou a
-situação. A causa é uma hora a 2,41 gwei (19× a mediana) que o estimador previu em ~0,05 —
+**A causa da cauda:** uma hora a 2,41 gwei (19× a mediana) que o estimador previu em ~0,05 —
 erro de 45×. O MILP concentrou 15 das 50 transações ali. Gas tem cauda pesada e Holt-Winters
 sem tendência não vê pico nenhum.
+
+**A formulação bate o ingênuo com folga** em todos os cortes — o plano uniforme perde de 24%
+a 74%. O problema não é distribuir; é *quanto* concentrar.
 
 **A trava de dominância (decisão 31) não protege contra isso**, e é importante não confundir
 as duas coisas: ela compara plano e baseline pelos custos **previstos**. Quando a previsão
 erra, o plano aprovado por ela ainda pode sair muito pior na realidade.
 
-Uma varredura preliminar de teto sobre o corpus anterior de 96h levou a mediana de −544%
-(teto 15) para −0,1% (teto 3) — espalhar mais reduz a exposição ao pico. **Não recalibrar a
-decisão 6 a partir disso ainda:** aquela varredura é de outro corpus, e falta ver o que
-acontece com a mediana boa das 120h. É a próxima medição, não uma conclusão.
+**A varredura de teto sobre as 120h, agregado, N=50:**
+
+| teto | 24h | 12h |
+|---|---|---|
+| 5 | **−0,7%** | **+6,7%** |
+| 6 | −10,5% | +6,5% |
+| 10 | −14,1% | +0,6% |
+| 15 (decisão 6) | **−32,9%** | **−6,3%** |
+| 20 | −46,3% | −10,1% |
+
+O sinal é o mesmo nos dois horizontes: **o teto de 30% de N é permissivo demais para gas
+real.** `teto = 5` (10% de N) é o melhor agregado em 24h e o único ponto claramente lucrativo
+de toda a varredura em 12h. Em 24h o p25 degrada monotonicamente com o teto, de −75,9% (teto
+3) a −713,1% (teto 20) — é o teto que controla a exposição ao pico.
+
+O teto da decisão 6 foi calibrado por Monte Carlo sobre dado **sintético**, que não tem cauda
+pesada. A recalibração para ~10% de N tem evidência direta, mas **é decisão de produto, não
+técnica**: são 5 dias de corpus com um único pico dominando a cauda, e a decisão 6 está
+declarada fechada. Fica registrado, não aplicado.
+
+**A captura não serve para escolher o teto** — é máxima em 12 (80%), um dos piores agregados.
+Mede quanto do ganho alcançável o plano pegou, não quanto dinheiro sobrou.
 
 **Limites do resultado, e são grandes:** 120h e 49 origens; uma única hora de pico domina a
 cauda inteira; o estimador roda com menos de uma semana de histórico contra as ~4 semanas que
@@ -656,10 +679,11 @@ a decisão 8 pede, com cada dia da semana aparecendo uma vez só.
   `docs/estado-do-projeto.md` pedia "índice engenheirado" no piso mínimo; o que foi entregue
   é um índice diferente do previsto, com fórmula fechada e defensável — vale dizer isso na
   demo em vez de deixar parecer que o item saiu igual ao planejado
-- ~~Backtest histórico~~ — feito (decisão 33). O que ele **abriu**: a cauda de −601% em 24h
-  precisa de tratamento antes de o otimizador poder ser recomendado para prazos longos, e a
-  varredura de teto sobre as 120h ainda não foi refeita
-- Recalibrar teto (decisão 6) com dado histórico real
+- ~~Backtest histórico~~ — feito (decisão 33). O que ele **abriu**: no agregado o otimizador
+  hoje **perde dinheiro** (−32,9% em 24h com o teto atual). A varredura aponta `teto ≈ 10% de
+  N`, mas recalibrar a decisão 6 é decisão de produto — pendente
+- **Recalibrar o teto (decisão 6)** — a evidência da decisão 33 está medida e aponta para ~10%
+  de N; falta a decisão de aplicar, e mais corpus para confirmar
 - Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado
   sintético; hoje há ~95h de mainnet capturadas, suficiente para o fator de dia da semana ficar
   fraco (menos de 1 semana completa) mas já dá para checar a sazonalidade de 24h

@@ -208,6 +208,22 @@ def rodar(serie: pd.Series, horizontes: list[int], enes: list[int],
 # Resumo
 # ---------------------------------------------------------------------------
 
+def _economia_agregada(obs: list[Observacao]) -> float:
+    """
+    Economia sobre a SOMA dos custos de todas as origens.
+
+    A mediana responde "como vai um uso tipico" e ignora magnitude: com a trava
+    de dominancia, mais da metade das origens devolve exatamente 0%, e a mediana
+    fica presa nesse zero mesmo quando as origens restantes ganham ou perdem
+    muito. Este agregado responde a outra pergunta, que e' a que importa para
+    quem paga a conta: usando a ferramenta em TODAS as origens, gastaria mais ou
+    menos no total?
+    """
+    total_plano = sum(o.custo_plano for o in obs)
+    total_agora = sum(o.custo_agora for o in obs)
+    return 100.0 * (1 - total_plano / total_agora) if total_agora > 0 else 0.0
+
+
 def _quartis(valores: list[float]) -> tuple[float, float, float]:
     ordenados = sorted(valores)
     if len(ordenados) < 4:
@@ -219,8 +235,8 @@ def _quartis(valores: list[float]) -> tuple[float, float, float]:
 
 def resumir(resultados: dict[tuple[int, int], list[Observacao]]) -> str:
     linhas = [
-        "| N | horizonte | origens | economia do plano (mediana, p25–p75) | oráculo | uniforme | captura | plano ≥ agora |",
-        "|---|---|---|---|---|---|---|---|",
+        "| N | horizonte | origens | economia do plano (mediana, p25–p75) | agregado | oráculo | uniforme | captura | plano ≥ agora |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for (n, h), obs in sorted(resultados.items()):
         if not obs:
@@ -238,10 +254,98 @@ def resumir(resultados: dict[tuple[int, int], list[Observacao]]) -> str:
 
         linhas.append(
             f"| {n} | {h}h | {len(obs)} | **{mediana:+.1f}%** ({p25:+.1f} – {p75:+.1f}) | "
+            f"{_economia_agregada(obs):+.1f}% | "
             f"{med_oraculo:+.1f}% | {med_uniforme:+.1f}% | {texto_captura} | "
             f"{nao_piorou}/{len(obs)} |"
         )
     return "\n".join(linhas)
+
+
+
+# ---------------------------------------------------------------------------
+# Varredura de teto (calibracao da decisao 6)
+# ---------------------------------------------------------------------------
+
+def _cache_de_previsoes(serie: pd.Series, horizonte: int, minimo_treino: int):
+    """
+    Treina uma vez por origem e guarda (previsao, custos reais).
+
+    Existe para a varredura de teto nao retreinar o Holt-Winters a cada valor de
+    teto: o modelo nao depende do teto, so' o MILP depende.
+    """
+    from estimador_custo import prever, treinar
+
+    pares = []
+    for t in range(minimo_treino, len(serie) - horizonte + 1):
+        modelo = treinar(serie.iloc[:t])
+        pares.append((prever(modelo, horizonte), serie.iloc[t:t + horizonte].to_numpy()))
+    return pares
+
+
+def varrer_tetos(serie: pd.Series, horizonte: int, n_transacoes: int,
+                 tetos: list[int], minimo_treino: int = MINIMO_TREINO) -> str:
+    """
+    Mede economia REALIZADA para cada teto por janela.
+
+    O teto da decisao 6 -- max(30% de N, N/M) -- foi calibrado por Monte Carlo
+    sobre dado SINTETICO, que nao tem a cauda pesada do gas real. Esta varredura
+    e' a mesma pergunta refeita sobre a serie de mainnet.
+
+    A leitura tem dois lados que puxam em direcoes opostas: teto alto concentra
+    nas horas previstas baratas (mediana melhor quando a previsao acerta) e
+    expoe ao pico (cauda pior quando ela erra). Escolher olhando so' a mediana,
+    ou so' o p25, erra dos dois jeitos.
+    """
+    from otimizador import calcular_teto
+
+    pares = _cache_de_previsoes(serie, horizonte, minimo_treino)
+    teto_atual = calcular_teto(n_transacoes, horizonte)
+
+    linhas = [
+        f"Horizonte {horizonte}h · N={n_transacoes} · {len(pares)} origens · "
+        f"teto da decisão 6 = {teto_atual}",
+        "",
+        "| teto | mediana | p25 | p75 | **agregado** | captura | plano ≥ agora |",
+        "|---|---|---|---|---|---|---|",
+    ]
+
+    for teto in tetos:
+        if teto * horizonte < n_transacoes:
+            continue  # capacidade insuficiente: o MILP seria inviavel
+        obs = [
+            avaliar_origem_com_teto(previstos, reais, n_transacoes, teto)
+            for previstos, reais in pares
+        ]
+        economias = [o.economia_plano_pct for o in obs]
+        p25, mediana, p75 = _quartis(economias)
+        capturas = [o.captura_pct for o in obs if o.captura_pct is not None]
+        texto_captura = f"{statistics.median(capturas):.0f}%" if capturas else "—"
+        nao_piorou = sum(1 for o in obs if o.custo_plano <= o.custo_agora + 1e-9)
+
+        marca = " ←" if teto == teto_atual else ""
+        linhas.append(
+            f"| {teto}{marca} | {mediana:+.1f}% | {p25:+.1f}% | {p75:+.1f}% | "
+            f"**{_economia_agregada(obs):+.1f}%** | "
+            f"{texto_captura} | {nao_piorou}/{len(obs)} |"
+        )
+
+    return "\n".join(linhas)
+
+
+def avaliar_origem_com_teto(previstos: np.ndarray, reais: np.ndarray,
+                            n_transacoes: int, teto: int) -> Observacao:
+    """Como `avaliar_origem`, mas com o teto forcado. O oraculo usa o MESMO
+    teto -- comparar contra um oraculo mais livre confundiria erro de previsao
+    com folga de restricao."""
+    plano = otimizar(previstos, n_transacoes, GAS_USED, teto=teto)
+    oraculo = otimizar(reais, n_transacoes, GAS_USED, teto=teto)
+    return Observacao(
+        origem=pd.Timestamp("1970-01-01"),   # nao usado no resumo agregado
+        custo_agora=float(n_transacoes * GAS_USED * reais[0]),
+        custo_plano=_custo_real(plano.x, reais),
+        custo_oraculo=_custo_real(oraculo.x, reais),
+        custo_uniforme=_custo_real(_plano_uniforme(n_transacoes, len(reais)), reais),
+    )
 
 
 def main() -> None:
@@ -250,14 +354,21 @@ def main() -> None:
     p.add_argument("--horizontes", type=int, nargs="+", default=[6, 12, 24])
     p.add_argument("--enes", type=int, nargs="+", default=[10, 50])
     p.add_argument("--saida", type=Path, default=None, help="grava o relatorio em markdown")
+    p.add_argument("--tetos", type=int, nargs="+", default=None,
+                   help="em vez da tabela padrao, varre estes tetos por janela")
     args = p.parse_args()
 
     serie = carregar_corpus(args.corpus)
     print(f"corpus: {len(serie)}h contiguas, de {serie.index[0]} a {serie.index[-1]}")
     print(f"treino minimo {MINIMO_TREINO}h · gas_used {GAS_USED:,} · horizontes {args.horizontes}\n")
 
-    resultados = rodar(serie, args.horizontes, args.enes)
-    tabela = resumir(resultados)
+    if args.tetos:
+        tabela = "\n\n".join(
+            varrer_tetos(serie, h, n, args.tetos)
+            for h in args.horizontes for n in args.enes
+        )
+    else:
+        tabela = resumir(rodar(serie, args.horizontes, args.enes))
     print(tabela)
 
     if args.saida:
