@@ -817,3 +817,85 @@
   background: var(--neutro-fraco);
   color: var(--text-300);
 }
+
+/* ---------- linha do tempo: real + previsto ---------- */
+
+.linha {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 130px;
+}
+
+.linha__barra {
+  flex: 1 1 0;
+  min-width: 0;
+  height: max(var(--altura), 2px);
+  border-radius: 2px 2px 0 0;
+  /* Preço real: sólido. É o que aconteceu. */
+  background: var(--blue-500);
+}
+
+/* Previsão em tom mais fraco e translúcida: a figura não pode sugerir que
+   previsto e realizado têm o mesmo peso de evidência. */
+.linha__barra--prevista {
+  background: rgba(120, 170, 235, 0.32);
+}
+
+.linha__barra--escolhida {
+  background: linear-gradient(180deg, var(--barato), rgba(74, 222, 154, 0.45));
+}
+
+/* Divisor no "agora", desenhado na borda da primeira barra prevista. */
+.linha__barra--divisor {
+  border-left: 1px dashed rgba(230, 240, 255, 0.55);
+  margin-left: 2px;
+  padding-left: 2px;
+}
+
+.linha__eixo {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.5rem 0 0.4rem;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-600);
+}
+
+.linha__marca {
+  color: var(--text-300);
+}
+
+.linha__legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.7rem;
+  color: var(--text-600);
+}
+
+.linha__legenda span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.linha__legenda .ponto { margin-left: 0; }
+
+.ponto--real { background: var(--blue-500); }
+.ponto--previsto { background: rgba(120, 170, 235, 0.45); }
+
+.row__ticker {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.row__relogio {
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text-600);
+}

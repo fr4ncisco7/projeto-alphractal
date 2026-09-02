@@ -1,16 +1,25 @@
 import { useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { Panel } from "../components/Panel";
+import { JustificativaDasHoras } from "../components/JustificativaDasHoras";
+import { LinhaDoTempo, montarLinha } from "../components/LinhaDoTempo";
 import { useHistoricoDeExecucoes } from "../hooks/useHistoricoDeExecucoes";
+import { useResource } from "../hooks/useResource";
 import { apiRequest } from "../lib/api";
 import { endpoints } from "../lib/endpoints";
 import { ApiError } from "../lib/errors";
 import { dataHora, gwei, horaCurta, percentual, usd } from "../lib/formato";
-import type { JanelaPlano, Otimizacao } from "../types";
+import type { JanelaPlano, Otimizacao, SerieCalendario } from "../types";
 import "./pages.css";
 
 /** Transferência simples de ETH. O valor mais comum e um padrão seguro. */
 const GAS_USED_PADRAO = 21_000;
+
+/** Dias de histórico usados para justificar as horas escolhidas. */
+const DIAS_DE_CONTEXTO = 7;
+
+/** Horas de preço real desenhadas antes do divisor na linha do tempo. */
+const HORAS_NA_LINHA = 24;
 
 export function PredictionsPage() {
   const [nTransacoes, setNTransacoes] = useState("50");
@@ -21,6 +30,12 @@ export function PredictionsPage() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const historico = useHistoricoDeExecucoes();
+  // Contexto histórico para a linha do tempo e para a justificativa das horas.
+  // Carregado uma vez, independente do plano: se falhar, o plano continua
+  // aparecendo -- é contexto, não resultado.
+  const contexto = useResource<SerieCalendario>(
+    `${endpoints.gasCalendario}?dias=${DIAS_DE_CONTEXTO}`,
+  );
 
   async function otimizar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -228,8 +243,14 @@ export function PredictionsPage() {
                 <ul className="rows">
                   {janelasComTransacoes.map((j) => (
                     <li key={j.janela} className="row">
+                      {/* "+6h" obriga quem lê a fazer a conta de cabeça para
+                          saber quando é. O relógio ao lado resolve, e é o que
+                          a pessoa precisa para agendar. */}
                       <span className="row__ticker">
                         {j.janela === 0 ? "agora" : `+${j.janela}h`}
+                        <small className="row__relogio">
+                          {relogioDaJanela(resultado.historico_ate, j.janela)}
+                        </small>
                       </span>
                       <span className="row__meter" aria-hidden="true">
                         <span
@@ -246,6 +267,40 @@ export function PredictionsPage() {
                   Histórico usado: {resultado.historico_horas} h.
                 </p>
               </Panel>
+
+              {contexto.data && contexto.data.serie.length > 0 && (
+                <Panel
+                  title="Linha do tempo"
+                  hint={`${HORAS_NA_LINHA} h de preço real, e depois a previsão do horizonte`}
+                >
+                  <LinhaDoTempo
+                    barras={montarLinha(
+                      contexto.data.serie,
+                      resultado.plano,
+                      resultado.historico_ate,
+                      HORAS_NA_LINHA,
+                    )}
+                  />
+                  <p className="metric__hint">
+                    A metade esquerda é preço que já aconteceu; a direita é previsão. As duas
+                    na mesma escala, para dar para comparar. Se o ritmo do dia se repete, o
+                    vale da direita cai no mesmo horário do vale da esquerda.
+                  </p>
+                </Panel>
+              )}
+
+              {contexto.data && (
+                <Panel
+                  title="Por que essas horas"
+                  hint={`As horas escolhidas confrontadas com os últimos ${DIAS_DE_CONTEXTO} dias`}
+                >
+                  <JustificativaDasHoras
+                    plano={resultado.plano}
+                    historico={contexto.data.serie}
+                    dias={DIAS_DE_CONTEXTO}
+                  />
+                </Panel>
+              )}
 
               <Panel
                 title="Por que este plano"
@@ -265,6 +320,19 @@ export function PredictionsPage() {
       </div>
     </>
   );
+}
+
+/**
+ * Que horas é a janela `i`, em relógio de parede.
+ *
+ * A janela 0 cobre a hora seguinte ao fim do histórico -- é de lá que o
+ * estimador começa a prever --, então a janela i cai em `historico_ate + i+1`.
+ */
+function relogioDaJanela(historicoAte: string, janela: number): string {
+  const t = new Date(historicoAte).getTime() + (janela + 1) * 3_600_000;
+  return new Date(t).toLocaleString("pt-BR", {
+    weekday: "short", hour: "2-digit", minute: "2-digit",
+  });
 }
 
 /**

@@ -797,6 +797,34 @@ Um defeito de layout apareceu na verificação: filhos diretos de `.grid--split`
 colunas, então o painel de histórico solto abriu uma terceira coluna em vez de ficar abaixo
 do formulário. Resolvido envolvendo formulário e histórico numa `.stack`.
 
+## 37. Justificar a escolha dos horários, não só apresentá-la
+
+A tela mostrava o plano e a curva prevista. Faltava o que responde "por que essas horas?" —
+e previsão isolada não responde: quem olha não tem como saber se aquele vale das 3h é um
+padrão que se repete todo dia ou um palpite do modelo.
+
+**Linha do tempo.** 24h de preço real emendadas à previsão do horizonte, numa escala só, com
+divisor no "agora" e as janelas escolhidas em verde. O real é sólido, o previsto é
+translúcido — a figura não pode sugerir que previsão e realizado têm o mesmo peso de
+evidência. Se o ritmo do dia se repete, o vale da direita cai no mesmo horário do vale da
+esquerda, e isso é a justificativa.
+
+**"Por que essas horas".** Confronta as horas escolhidas com o que essas mesmas horas
+fizeram nos últimos 7 dias: posição histórica média entre as 24, consistência (a mesma
+fórmula da decisão 29) e quanto abaixo do preço de agora estão. O painel diz explicitamente
+quando as duas leituras **discordam** — previsão apostando em horas que historicamente não
+eram baratas —, porque é aí que o plano está apoiado só na previsão, e a previsão é o elo
+fraco medido na decisão 34.
+
+**Relógio de parede nas janelas.** "+6h" virou "+6h / qua., 17:00". Obrigar quem lê a fazer
+a conta de cabeça para saber quando agendar era uma barreira boba numa tela cujo produto é
+justamente *quando* executar.
+
+Nada disso exigiu backend novo: a previsão já vinha em `plano[].custo_i_gwei`, o histórico
+sai do `/gas/calendario` que a tela de Análise já consome, e o alinhamento entre os dois vem
+de `historico_ate` — a janela `i` cobre `historico_ate + (i+1)h`, porque o estimador prevê a
+partir da hora seguinte ao fim do histórico.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
