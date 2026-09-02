@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Backdrop } from "../components/Backdrop";
+import { FormulaObjetivo } from "../components/FormulaObjetivo";
 import { Logo } from "../components/Logo";
 import { apiRequest } from "../lib/api";
 import { endpoints } from "../lib/endpoints";
@@ -119,16 +120,22 @@ export function LandingPage() {
         {/* ---------------- formulação ---------------- */}
         <section className="secao">
           <h2 className="secao__titulo">A formulação</h2>
+          <p className="secao__texto">
+            O otimizador resolve um problema de programação inteira mista. Cada cor abaixo
+            marca um papel diferente na conta.
+          </p>
+
+          <div className="formulacao-caixa">
+            <FormulaObjetivo />
+          </div>
+
           <div className="grid grid--split">
             <div className="cartao">
-              <h3>Programação inteira, não contínua</h3>
-              <pre className="formula">{`minimizar   Σ  xᵢ · gas_used · custoᵢ
-sujeito a   Σ  xᵢ = N
-            0 ≤ xᵢ ≤ teto`}</pre>
+              <h3>Por que inteiro, e não contínuo</h3>
               <p>
-                <code>xᵢ</code> é o <strong>número de transações</strong> na janela i — um
-                inteiro, porque meia transação não existe. Resolvido com{" "}
-                <code>scipy.optimize.milp</code>.
+                <code>xᵢ</code> conta transações, e meia transação não existe. Um LP
+                contínuo devolveria 7,4 transações numa janela — um número que ninguém
+                consegue executar. Resolvido com <code>scipy.optimize.milp</code>.
               </p>
             </div>
             <div className="cartao">

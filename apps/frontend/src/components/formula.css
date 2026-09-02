@@ -1,0 +1,206 @@
+/* A formulação do otimizador. Matemática desenhada, não bloco de código. */
+
+.formulacao {
+  --cor-decisao: var(--blue-300);
+  --cor-dado: var(--text-100);
+  --cor-previsto: var(--caro);
+}
+
+/* ---------- função objetivo ---------- */
+
+.objetivo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  padding: clamp(1.4rem, 3vw, 2.2rem) clamp(1rem, 3vw, 2rem);
+  border: 1px solid rgba(120, 170, 235, 0.22);
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 160% at 50% 0%, rgba(47, 124, 246, 0.12), transparent 65%),
+    rgba(6, 10, 18, 0.6);
+  text-align: center;
+}
+
+.objetivo__rotulo {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-600);
+}
+
+.expressao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  font-family: var(--font-display);
+  /* Grande de propósito: é a única equação da tela e o que ela pede é atenção. */
+  font-size: clamp(1.5rem, 3.4vw, 2.2rem);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.termo sub {
+  font-size: 0.52em;
+  font-weight: 400;
+  /* `vertical-align: sub` do navegador desce demais num corpo grande. */
+  vertical-align: -0.18em;
+  margin-left: 0.02em;
+}
+
+.termo--decisao { color: var(--cor-decisao); }
+.termo--dado { color: var(--cor-dado); }
+.termo--previsto { color: var(--cor-previsto); }
+
+.op {
+  color: var(--text-600);
+  font-weight: 400;
+}
+
+/* ---------- somatório ---------- */
+
+/* Grid de três linhas: limite de cima, sigma, limite de baixo. Empilhar com
+   `sup`/`sub` deixaria os limites ao LADO do sigma, que é outra notação. */
+.somatorio {
+  display: inline-grid;
+  grid-template-rows: auto auto auto;
+  justify-items: center;
+  align-items: center;
+  line-height: 1;
+  margin-right: 0.15rem;
+}
+
+.somatorio__sigma {
+  font-size: 1.5em;
+  font-weight: 400;
+  color: var(--text-300);
+  /* O glifo ∑ é desenhado fora da caixa de linha em boa parte das fontes: com
+     line-height 1 ele invadia a linha de baixo e comia o "i = 0". A folga aqui
+     reserva o espaço, e fica no `em` do próprio sigma para escalar junto. */
+  line-height: 1.06;
+  margin: 0.06em 0;
+}
+
+.somatorio__cima,
+.somatorio__baixo {
+  font-family: var(--font-body);
+  /* 0,34em do corpo da expressão, com piso absoluto: nas restrições o corpo é
+     menor e a proporção sozinha levava os limites a ~6 px, ilegíveis. */
+  font-size: max(0.34em, 0.6rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--text-600);
+  white-space: nowrap;
+}
+
+/* Nas restrições o somatório entra sem limites: a função objetivo logo acima já
+   estabeleceu que i vai de 0 a M−1, e repetir num corpo menor só produzia dois
+   borrões. É a abreviação usual. */
+.somatorio--compacto .somatorio__cima,
+.somatorio--compacto .somatorio__baixo {
+  display: none;
+}
+
+.somatorio--compacto .somatorio__sigma {
+  font-size: 1.3em;
+  margin: 0;
+}
+
+/* ---------- legenda dos termos ---------- */
+
+.legenda-termos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 1.3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legenda-termos li {
+  display: grid;
+  grid-template-columns: 0.55rem auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--text-500);
+}
+
+.legenda-termos strong {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.legenda-termos li:nth-child(1) strong { color: var(--cor-decisao); }
+.legenda-termos li:nth-child(2) strong { color: var(--cor-dado); }
+.legenda-termos li:nth-child(3) strong { color: var(--cor-previsto); }
+
+.legenda-termos .ponto {
+  align-self: center;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin: 0;
+  border-radius: 2px;
+}
+
+.ponto--decisao { background: var(--cor-decisao); }
+.ponto--dado { background: var(--cor-dado); }
+.ponto--previsto { background: var(--cor-previsto); }
+
+/* ---------- restrições ---------- */
+
+.restricoes {
+  margin-top: 1.6rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.restricoes__rotulo {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-600);
+}
+
+.restricoes ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.restricoes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.1rem;
+}
+
+.restricao {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  min-width: 9.5rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.restricao__leitura {
+  flex: 1;
+  min-width: 14rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-500);
+}

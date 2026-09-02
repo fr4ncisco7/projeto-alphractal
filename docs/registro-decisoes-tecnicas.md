@@ -879,6 +879,42 @@ lado dos +45,4% que a previsão perfeita acharia, e a frase de que a distância 
 erro de previsão. Publicar só o primeiro número seria vender melhor e mentir; publicar só o
 segundo seria vender o que não existe.
 
+## 40. A função objetivo desenhada como matemática
+
+A formulação aparecia num `<pre>` monoespaçado: legível, mas com o ∑ do tamanho de uma letra
+e os índices em caracteres unicode sobrescritos, que quebram conforme a fonte. Virou um
+componente (`FormulaObjetivo`) com somatório de verdade — limites em cima e embaixo — e
+`<sub>` reais.
+
+**A cor codifica o papel de cada termo**, e é o que transforma a figura numa explicação em
+vez de uma citação:
+
+| cor | papel | termo |
+|---|---|---|
+| azul | o que o solver **decide** | `xᵢ` |
+| neutro | entrada **fixa** do pedido | `gas_used`, `N`, `teto` |
+| âmbar | o que vem de **previsão** | `custoᵢ` |
+
+O âmbar não é decoração: `custoᵢ` é a única parte estimada da conta, e é o elo fraco medido
+na decisão 34 — o oráculo acha +45% onde o plano captura 4%. A legenda diz isso na cara.
+
+**Na tela do Solver a mesma fórmula aparece com os valores do pedido** no lugar dos símbolos:
+`∑ xᵢ · 21.000 · custoᵢ`, `∑ xᵢ = 50`, `0 ≤ xᵢ ≤ 5`. É o que liga a matemática ao plano
+desenhado logo acima, em vez de deixar a formulação como um bloco abstrato numa página
+institucional.
+
+Sem KaTeX ou MathJax: é uma expressão só, e a biblioteca custaria mais que o CSS.
+
+Dois defeitos apareceram na verificação em navegador, nenhum visível no código:
+
+- **O glifo ∑ é desenhado fora da caixa de linha** em boa parte das fontes. Com
+  `line-height: 1` ele invadia a linha de baixo e comia o `i = 0`. Resolvido com folga
+  vertical no `em` do próprio sigma, para escalar junto.
+- **Os limites do somatório nas restrições ficavam a ~6 px** — 0,34em de um corpo já menor.
+  Passaram a ter piso absoluto, e nas restrições o somatório entra **sem** limites: a função
+  objetivo logo acima já estabeleceu que i vai de 0 a M−1, e repetir num corpo menor só
+  produzia dois borrões. É a abreviação usual.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e

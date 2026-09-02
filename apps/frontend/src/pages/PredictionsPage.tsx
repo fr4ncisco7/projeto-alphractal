@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { Panel } from "../components/Panel";
+import { FormulaObjetivo } from "../components/FormulaObjetivo";
 import { JustificativaDasHoras } from "../components/JustificativaDasHoras";
 import { LinhaDoTempo, montarLinha } from "../components/LinhaDoTempo";
 import { useHistoricoDeExecucoes } from "../hooks/useHistoricoDeExecucoes";
@@ -313,6 +314,23 @@ export function PredictionsPage() {
                   A linha tracejada é o preço previsto para agora: só há o que ganhar
                   nas janelas abaixo dela.
                 </p>
+              </Panel>
+
+              {/* A mesma formulação da apresentação do projeto, mas com os
+                  números DESTE pedido no lugar dos símbolos: é o que liga a
+                  matemática ao plano que está na tela logo acima. */}
+              <Panel
+                title="O que o solver resolveu"
+                hint="A formulação com os valores deste pedido"
+              >
+                <FormulaObjetivo
+                  valores={{
+                    nTransacoes: resultado.plano.reduce((t, j) => t + j.x, 0),
+                    gasUsed: Number(gasUsed),
+                    teto: resultado.teto_por_janela,
+                    janelas: resultado.n_janelas,
+                  }}
+                />
               </Panel>
             </>
           )}
