@@ -523,6 +523,66 @@ ele exibia nome e plano vindos do backend simulado ("João Pedro · PRO") — pi
 frente do parceiro. No lugar, a identificação do módulo. Quando o painel entrar na
 plataforma, esse canto é da casca da Alphractal.
 
+## 31. Trava de dominância: o otimizador nunca recomenda algo pior que não usá-lo
+
+**O problema, medido.** Em 02/09/2026, contra a série real de mainnet, varremos os prazos
+com N=50 e gas_used=21.000:
+
+| prazo | economia | | prazo | economia |
+|---|---|---|---|---|
+| 2h | **−133,76%** | | 12h | **−31,94%** |
+| 3h | **−169,89%** | | 20h | **−31,94%** |
+| 4h | **−177,08%** | | 24h | +31,31% |
+| 6h | **−68,85%** | | 48h | +55,50% |
+
+Para prazos de 2 a 20 horas o serviço devolvia um plano **pior que não fazer nada** — e
+devolvia junto com o plano, de modo que seguir a recomendação custaria dinheiro. A decisão 10
+e o `test_economia_negativa_quando_t0_e_o_melhor_momento` já documentavam que a economia
+podia ser negativa; o que ninguém tinha medido é **com que frequência** isso acontece em
+dado real. A resposta foi: na maior parte da faixa útil de prazos.
+
+**A causa é estrutural, não um erro de cálculo.** O MILP não tem a opção de não fazer nada:
+`Σxᵢ = N` com `xᵢ ≤ teto` o **proíbe** de concentrar as N transações numa janela só sempre
+que `teto < N`. Quando a janela 0 é a mais barata do horizonte — comum em prazo curto, e o
+caso da série medida, em que nenhuma das 19 horas seguintes era mais barata que a atual —
+ele é obrigado a espalhar para janelas piores.
+
+**A trava.** Depois de resolver o MILP, comparar o plano com a solução trivial "tudo em
+t=0" e devolver a melhor. Quando o baseline vence, `x = [N, 0, …]`, `economia_pct = 0` e
+`executar_agora = true`.
+
+Isso **não afrouxa a formulação** e não reabre a decisão 6: a comparação é entre duas
+soluções viáveis do mesmo problema, e o teto continua valendo para o plano distribuído. O
+baseline não o viola porque não é uma escolha do otimizador — é o que o usuário faria sem
+ele. E há um argumento de mérito: o teto existe para conter **erro de previsão**, e
+concentrar *agora* não tem previsão envolvida.
+
+A garantia que passa a valer: **usar o otimizador nunca sai pior que não usá-lo; no pior
+caso, empata.** Travada por `test_economia_nunca_e_negativa`, parametrizado em 7 curvas de
+custo × 4 valores de N.
+
+Três defeitos apareceram na implementação:
+
+- **O empate virava dominância por ruído de ponto flutuante.** Com uma janela só, os dois
+  custos são a mesma conta em ordem de associação diferente (`(g·c) @ x` contra `n·g·c₀`), e
+  o arredondamento decidia o sinalizador. Resolvido com tolerância relativa de 1e-9 — empate
+  não é o plano perdendo, é o plano *sendo* o baseline.
+- **`economia_pct` chegava à tela como "−0,00%"** — o mesmo ruído, com um sinal de menos sem
+  significado. Grampeada em `max(0, …)`, o que não esconde nada porque depois da trava
+  economia negativa não existe mais.
+- **`usd(0)` renderizava "US$ 0,0000000".** A precisão adaptativa de `formato.ts` escolhe as
+  casas pela magnitude, e zero caía no ramo mais preciso. Mesma correção em `gwei(0)`.
+
+**O backend simulado recebeu a mesma trava.** Ele não resolve MILP nenhum, mas precisa ter o
+mesmo contrato de saída — senão quem desenvolve a interface sem Docker desenha para um
+comportamento que não existe.
+
+**O que a trava NÃO resolve.** `economia_pct` continua sendo economia **prevista**: tanto o
+custo do plano quanto o baseline saem do estimador, então o modelo está avaliando a si
+mesmo. Se a previsão errar, o ganho realizado é outro. A trava garante que o serviço não
+recomenda o pior dos dois caminhos *segundo a própria previsão* — não que o +31,31% se
+concretize. Medir isso é função do backtest, ainda pendente.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
@@ -531,7 +591,9 @@ plataforma, esse canto é da casca da Alphractal.
   é um índice diferente do previsto, com fórmula fechada e defensável — vale dizer isso na
   demo em vez de deixar parecer que o item saiu igual ao planejado
 - **Backtest histórico** — não existe (`apps/solver/backtest*` ausente). É o "teto desejado" da
-  definição de pronto e é o que produz o número quantificado de economia para a apresentação
+  definição de pronto, é o que produz o número quantificado de economia para a apresentação e,
+  desde a decisão 31, é a **única** forma de saber se a economia prevista pelo otimizador se
+  concretiza — hoje ele avalia a si mesmo com o próprio estimador
 - Recalibrar teto (decisão 6) com dado histórico real
 - Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado
   sintético; hoje há ~95h de mainnet capturadas, suficiente para o fator de dia da semana ficar
