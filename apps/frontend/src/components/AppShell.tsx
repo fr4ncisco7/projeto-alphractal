@@ -7,7 +7,7 @@ import "./AppShell.css";
 const navigation = [
   { to: "/", label: "Tela Inicial" },
   { to: "/analise", label: "Análise" },
-  { to: "/predicoes", label: "Predições" },
+  { to: "/predicoes", label: "Solver" },
 ];
 
 export function AppShell() {
