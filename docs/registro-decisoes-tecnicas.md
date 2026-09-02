@@ -478,6 +478,51 @@ contraste mentindo sobre a escala.
 O cálculo é do cliente, sobre a série horária que a tela já carrega — não vale rota nova
 para algumas centenas de pontos já agregados pelo banco.
 
+## 30. Remoção da tela de login e abertura no lugar dela
+
+O Fees Monitor é um módulo da aba "Fees" da plataforma da Alphractal. A autenticação é da
+plataforma; quem chega ao painel já passou por ela. A tela de login que veio junto com o
+frontend do time era a casca visual do shell — bonita, sem backend por trás, e a origem de
+dois defeitos já registrados (decisão 27b). Mantê-la significava demonstrar ao parceiro uma
+cerimônia que não existe no produto.
+
+**Removidos:** `LoginPage` e seu CSS (586 linhas), `SplashScreen`, `RouteGuards`,
+`AuthProvider`/`AuthContext`/`useAuth`/`authService`, `lib/session.ts`, as rotas `/auth/*`
+de `endpoints.ts` e do backend simulado, os tipos `User`/`Credentials`/`LoginResponse`, e
+toda a passagem de token no `api.ts` — incluindo a exceção `ROTAS_SIMULADAS`, que existia
+só para desviar `/auth/` para o mock. Está tudo no histórico do git se a plataforma quiser
+a casca de volta.
+
+**No lugar, uma abertura que faz trabalho real.** Em vez de um spinner por tempo fixo, ela
+dispara as três chamadas que o painel precisa e acende cada uma quando responde:
+`/health` (backend, banco, ingestão, solver), `/cotacao` e `/gas/estatisticas`. São três
+requisições separadas de propósito — uma resposta única faria os três itens acenderem no
+mesmo instante, e escalonar isso na mão seria encenação.
+
+- **Só o `/health` bloqueia.** Sem cotação o painel mostra gwei; sem estatísticas cada tela
+  tem seu próprio carregamento. Nenhuma das duas justifica segurar a aplicação na porta, e
+  a lista diz "o painel abre sem isso" quando a falha é dessas — mas não quando o backend
+  caiu junto, senão a ressalva mentiria.
+- **O painel monta assim que o `/health` responde**, por baixo da abertura. As requisições
+  dele correm durante o tempo mínimo de exibição, então quando a tela sai o conteúdo já
+  está desenhado, sem esqueleto.
+- **Tempo mínimo de 900 ms.** Contra a rede local as checagens voltam em dezenas de
+  milissegundos, e uma tela que aparece e some nesse intervalo lê como defeito de
+  renderização. O piso não atrasa nada — é sobreposto ao carregamento do painel.
+- **Falha do backend vira parede com `docker compose ps` e botão de nova tentativa**, que
+  refaz as checagens sem recarregar a página. Testado desligando o contêiner: a parede
+  aparece, o botão recupera.
+
+Dois defeitos corrigidos na verificação em navegador: o `TypeError: Failed to fetch` do
+fetch aparecia cru na tela (vocabulário do navegador, em inglês, sem dizer o que fazer), e
+o trilho de progresso ficava inteiro aceso em azul mesmo com as três checagens falhando —
+dizia "pronto" enquanto nada estava.
+
+**O cartão de usuário da barra lateral saiu junto.** Sem login não há quem identificar, e
+ele exibia nome e plano vindos do backend simulado ("João Pedro · PRO") — pior que nada na
+frente do parceiro. No lugar, a identificação do módulo. Quando o painel entrar na
+plataforma, esse canto é da casca da Alphractal.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
