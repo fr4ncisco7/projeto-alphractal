@@ -208,6 +208,29 @@ def rodar(serie: pd.Series, horizontes: list[int], enes: list[int],
 # Resumo
 # ---------------------------------------------------------------------------
 
+def _agregado(obs: list[Observacao], campo: str) -> float:
+    """Economia de uma estrategia sobre a SOMA dos custos de todas as origens."""
+    total = sum(getattr(o, campo) for o in obs)
+    total_agora = sum(o.custo_agora for o in obs)
+    return 100.0 * (1 - total / total_agora) if total_agora > 0 else 0.0
+
+
+def _captura_agregada(obs: list[Observacao]) -> float | None:
+    """
+    Quanto da economia alcancavel o plano capturou, tambem no agregado.
+
+    A versao por mediana comparava um plano medido em agregado com um oraculo
+    medido em mediana -- bases diferentes, numero sem sentido. Em 12h isso
+    produzia "captura 4%" contra um oraculo de mediana zero, o que parecia
+    catastrofe e era so' a mistura de escalas.
+    """
+    total_agora = sum(o.custo_agora for o in obs)
+    alcancavel = total_agora - sum(o.custo_oraculo for o in obs)
+    if alcancavel <= 1e-12:
+        return None
+    return 100.0 * (total_agora - sum(o.custo_plano for o in obs)) / alcancavel
+
+
 def _economia_agregada(obs: list[Observacao]) -> float:
     """
     Economia sobre a SOMA dos custos de todas as origens.
@@ -234,28 +257,30 @@ def _quartis(valores: list[float]) -> tuple[float, float, float]:
 
 
 def resumir(resultados: dict[tuple[int, int], list[Observacao]]) -> str:
+    # Tudo em agregado, na mesma base. Mediana e quartis ficam só para o plano,
+    # onde descrevem a dispersão que o agregado esconde.
     linhas = [
-        "| N | horizonte | origens | economia do plano (mediana, p25–p75) | agregado | oráculo | uniforme | captura | plano ≥ agora |",
+        "| N | horizonte | origens | plano agregado | (mediana, p25–p75) | oráculo | uniforme | captura | plano ≥ agora |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for (n, h), obs in sorted(resultados.items()):
         if not obs:
             continue
         p25, mediana, p75 = _quartis([o.economia_plano_pct for o in obs])
-        med_oraculo = statistics.median([o.economia_oraculo_pct for o in obs])
-        med_uniforme = statistics.median([o.economia_uniforme_pct for o in obs])
+        agr_oraculo = _agregado(obs, "custo_oraculo")
+        agr_uniforme = _agregado(obs, "custo_uniforme")
 
-        capturas = [o.captura_pct for o in obs if o.captura_pct is not None]
-        texto_captura = f"{statistics.median(capturas):.0f}%" if capturas else "—"
+        captura = _captura_agregada(obs)
+        texto_captura = f"{captura:.0f}%" if captura is not None else "—"
 
         # Fracao das origens em que seguir o plano NAO saiu pior que executar
         # tudo agora. E' a garantia pratica que interessa a quem usa.
         nao_piorou = sum(1 for o in obs if o.custo_plano <= o.custo_agora + 1e-9)
 
         linhas.append(
-            f"| {n} | {h}h | {len(obs)} | **{mediana:+.1f}%** ({p25:+.1f} – {p75:+.1f}) | "
-            f"{_economia_agregada(obs):+.1f}% | "
-            f"{med_oraculo:+.1f}% | {med_uniforme:+.1f}% | {texto_captura} | "
+            f"| {n} | {h}h | {len(obs)} | **{_economia_agregada(obs):+.1f}%** | "
+            f"{mediana:+.1f}% ({p25:+.1f} – {p75:+.1f}) | "
+            f"{agr_oraculo:+.1f}% | {agr_uniforme:+.1f}% | {texto_captura} | "
             f"{nao_piorou}/{len(obs)} |"
         )
     return "\n".join(linhas)
@@ -318,8 +343,8 @@ def varrer_tetos(serie: pd.Series, horizonte: int, n_transacoes: int,
         ]
         economias = [o.economia_plano_pct for o in obs]
         p25, mediana, p75 = _quartis(economias)
-        capturas = [o.captura_pct for o in obs if o.captura_pct is not None]
-        texto_captura = f"{statistics.median(capturas):.0f}%" if capturas else "—"
+        captura = _captura_agregada(obs)
+        texto_captura = f"{captura:.0f}%" if captura is not None else "—"
         nao_piorou = sum(1 for o in obs if o.custo_plano <= o.custo_agora + 1e-9)
 
         marca = " ←" if teto == teto_atual else ""
