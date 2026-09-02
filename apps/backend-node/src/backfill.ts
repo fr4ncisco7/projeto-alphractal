@@ -88,7 +88,38 @@ export async function backfill(horas: number): Promise<number> {
   }
 
   console.log(`[backfill] concluído: ${gravados.toLocaleString()} blocos`);
+
+  if (gravados > 0) await reprocessarAgregados(horas);
   return gravados;
+}
+
+/**
+ * Reprocessa `gas_1min` e `gas_1h` sobre a janela recém-preenchida.
+ *
+ * As agregações contínuas têm `materialized_only = false`, o que faz o dado
+ * NOVO aparecer na hora -- mas isso vale só para o que chega DEPOIS da marca
+ * d'água de materialização. O backfill escreve ATRÁS dela, em buckets que a
+ * Timescale já considera calculados, e por isso não são recalculados sozinhos.
+ *
+ * O sintoma é traiçoeiro: `bloco_gas` fica correto, o backfill relata sucesso,
+ * e mesmo assim o painel e o solver continuam enxergando o buraco. Aconteceu de
+ * verdade em 02/09/2026 -- 6.193 blocos gravados e a série horária seguiu com
+ * um vão de 17h, que só sumiu com o refresh manual.
+ *
+ * A margem de um dia para trás cobre o bucket parcial na borda da janela.
+ */
+async function reprocessarAgregados(horas: number): Promise<void> {
+  const fim = new Date();
+  const inicio = new Date(fim.getTime() - (horas + 24) * 3_600_000);
+
+  for (const agregado of ["gas_1min", "gas_1h"]) {
+    // CALL não pode rodar dentro de transação; o pg só abre uma se pedirmos.
+    await pool.query(
+      `CALL refresh_continuous_aggregate('${agregado}', $1::timestamptz, $2::timestamptz)`,
+      [inicio, fim],
+    );
+  }
+  console.log(`[backfill] agregados reprocessados desde ${inicio.toISOString().slice(0, 16)}`);
 }
 
 // Entrada de linha de comando
