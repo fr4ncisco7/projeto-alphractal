@@ -275,8 +275,9 @@ economia  : 22.75%   (contra executar as 50 agora)
 
 # 8. Testes automatizados
 
-O solver tem 62 testes versionados. Rodam dentro de um container, então não é preciso
-ter Python nem scipy instalados:
+## Solver — 99 testes
+
+Rodam dentro de um container, então não é preciso ter Python nem scipy instalados:
 
 ```bash
 ./scripts/testar-solver.sh              # suíte inteira, ~2s
@@ -284,13 +285,45 @@ ter Python nem scipy instalados:
 ```
 
 Cobrem o MILP comparado com força bruta, o estimador (inclusive um teste de regressão
-para um bug que já custou 51% de precisão) e o contrato HTTP.
+para um bug que já custou 51% de precisão), a trava de dominância e o contrato HTTP.
 
-O backend Node ainda não tem testes. Para pelo menos checar tipos:
+## Backend Node — 42 testes
 
 ```bash
-docker compose exec backend-node npx tsc --noEmit
+./scripts/testar-backend.sh             # 39 testes, ~0,5s, sem infraestrutura
+./scripts/testar-backend.sh --db        # + 3 de integração, exige a stack de pé
+./scripts/testar-backend.sh -t defasagem  # filtra pelo nome
 ```
+
+Sem `--db` nada externo é tocado: banco, solver, nó RPC e cotação são substituídos.
+Cobrem o barramento de eventos (o fan-out de uma assinatura para N conexões SSE), a
+cotação (cache de 60 s, fallback Alchemy→CoinGecko, retenção do último valor) e a camada
+HTTP (CORS, os 422 de validação, a trava de defasagem, os 503 de infraestrutura).
+
+Com `--db` entram os testes que só dado real exercita — o principal sendo o invariante da
+moda por histograma, que já devolveu um valor **acima do máximo do dia** numa versão
+anterior. O script pergunta a porta ao compose em vez de assumir 5432: neste projeto o
+banco é publicado em 5433, e bater na 5432 acerta um Postgres da sua máquina e falha com
+"password authentication failed", que parece credencial errada e não é.
+
+## Backtest do otimizador
+
+```bash
+./scripts/backtest.sh                                    # tabela completa
+./scripts/backtest.sh --tetos 3 5 8 10 15 --horizontes 24  # varredura de teto
+./scripts/backtest.sh --minimo-agregado -2.0             # trava de regressão (CI)
+```
+
+Roda sobre um corpus congelado em `apps/solver/tests/dados/mainnet_1h.csv` — não fala com
+o banco. Resultado e leitura em [`backtest-otimizador.md`](backtest-otimizador.md).
+
+## CI
+
+`.github/workflows/ci.yml` roda os quatro em push para `main`/`develop` e em pull request:
+solver, backtest com trava, backend (tsc + vitest + build) e frontend (tsc + build).
+
+O `tsc --noEmit` é o passo que mais paga: `npm run dev` usa tsx, que **não** checa tipos,
+então um erro de tipagem só aparecia quando alguém rodava o build à mão.
 
 ---
 

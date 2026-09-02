@@ -718,6 +718,52 @@ Nota metodológica: o 10% é o melhor ponto medido, não um ótimo demonstrado. 
 grossa (3, 5, 8, 10, 15, 20) sobre 49–61 origens de 5 dias, com um único pico dominando a
 cauda. Vale refazer com ~4 semanas de corpus.
 
+## 35. Testes do backend Node e CI
+
+**`index.ts` foi partido em `app.ts` + `index.ts`.** O `app.listen()` no escopo do módulo
+fazia com que qualquer `import` abrisse a porta 3000 e ligasse a ingestão — impossível
+testar rota. Agora `app.ts` monta e exporta o Express, `index.ts` só sobe o servidor.
+
+**42 testes (vitest + supertest), 39 deles sem infraestrutura nenhuma.** Banco, solver, nó
+RPC e cotação são substituídos; a suíte inteira roda em ~0,5s em qualquer máquina e em CI.
+O que cobrem foi escolhido pelo histórico de defeitos, não por cobertura de linha:
+
+- **CORS** — que o preflight liste `Authorization`. Sem isso o navegador bloqueava toda
+  chamada do painel, e `curl` não via nada porque `curl` não faz preflight (decisão 27).
+- **Cotação** — cache de 60s, compartilhamento de requisição em voo, fallback
+  Alchemy→CoinGecko, retenção do último valor quando a fonte cai, `null` sem cache.
+- **Trava de defasagem** — que devolva 503 com `defasagem_horas`, e que a checagem de
+  *tamanho* do histórico venha antes da de *idade* (a mensagem certa com banco vazio é
+  "insuficiente", não "defasado").
+- **Barramento de eventos** — o fan-out, e que um assinante que lança não derrube os
+  demais nem o laço da ingestão.
+
+Os 3 de integração ficam atrás de `TEST_DB=1`. O principal é o invariante da moda por
+histograma — `mínimo ≤ moda ≤ máximo` —, que uma versão anterior violou devolvendo 0,1
+gwei num dia de máximo 0,089 (decisão 27). Nenhum teste unitário pegaria isso.
+
+**Dois defeitos meus apareceram ao escrever os testes**, e os dois são do tipo que a suíte
+existe para pegar: um teste esquecia de cancelar assinaturas e contaminava o seguinte (o
+`Set` vive no escopo do módulo), e eu esperava 422 na trava de defasagem quando o código
+devolve 503 — o código estava certo, é indisponibilidade temporária e não pedido inválido.
+
+**`scripts/testar-backend.sh` pergunta a porta ao compose** em vez de assumir 5432. O
+projeto publica o banco em 5433 porque 5432 já estava ocupada, e bater na 5432 acerta um
+Postgres da máquina e falha com "password authentication failed" — que parece credencial
+errada e manda a investigação para o lado oposto.
+
+**CI em `.github/workflows/ci.yml`**, quatro jobs paralelos em push para `main`/`develop` e
+em PR: solver (99 testes), backtest com trava de regressão, backend (tsc + vitest + build)
+e frontend (tsc + build). As quatro sequências foram verificadas em ambiente limpo antes de
+subir, não só no ambiente de desenvolvimento.
+
+O job do **backtest** roda `--minimo-agregado -2.0`: o corpus é congelado em git e as
+dependências são pinadas, então o resultado é determinístico e dá para exigir um piso. Ele
+existe para impedir que uma "melhoria" no estimador ou na formulação faça o otimizador
+voltar a perder dinheiro sem ninguém perceber — que foi o estado em que ele viveu até a
+decisão 34. A folga até o pior valor atual (−0,7%) é deliberada: piso apertado demais
+transforma ruído numérico em build vermelho.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
@@ -736,8 +782,8 @@ cauda. Vale refazer com ~4 semanas de corpus.
 - Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado
   sintético; hoje há ~95h de mainnet capturadas, suficiente para o fator de dia da semana ficar
   fraco (menos de 1 semana completa) mas já dá para checar a sazonalidade de 24h
-- Testes do backend Node e CI — o solver tem suíte (decisão 20), o Node ainda não, e nada roda
-  automaticamente em push
+- ~~Testes do backend Node e CI~~ — feitos (decisão 35): 42 testes no Node e quatro jobs em
+  push/PR
 
 ### Resolvidas
 
