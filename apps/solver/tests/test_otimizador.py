@@ -53,7 +53,7 @@ def test_concentra_nas_janelas_mais_baratas():
     """Sem o teto o MILP poria tudo na mais barata; com teto, deve encher as
     mais baratas em ordem ate' o teto."""
     custo_i = [0.50, 0.10, 0.20, 0.30]
-    r = otimizar(custo_i, 10, GAS_USED)          # teto = max(3, 3) = 3
+    r = otimizar(custo_i, 10, GAS_USED)          # teto = max(1, 3) = 3
     assert r.x[1] == r.teto, "a janela mais barata deve estar no teto"
     assert r.x[0] < r.x[2], "a mais cara deve receber menos que a intermediaria"
 
@@ -66,21 +66,30 @@ def test_teto_nunca_e_furado():
     assert r.x[9] < 30, "sem teto o MILP concentraria as 30 aqui"
 
 
-# --- formula do teto (decisao 6) ---
+# --- formula do teto (decisoes 6 e 34) ---
 
 @pytest.mark.parametrize("n, m, esperado", [
-    (10, 24, 3),      # ceil(0,3*10)=3 domina
-    (100, 24, 30),    # ceil(0,3*100)=30 domina
+    (50, 24, 5),      # ceil(0,1*50)=5 domina -- o ponto calibrado na decisao 34
+    (100, 24, 10),    # ceil(0,1*100)=10 domina
+    (10, 24, 1),      # ceil(0,1*10)=1 domina
     (20, 2, 10),      # ceil(20/2)=10 domina -- o termo de viabilidade
     (1, 24, 1),       # N=1 nunca pode dar teto 0
-    (7, 3, 3),        # ceil(2,1)=3 e ceil(7/3)=3
+    (7, 3, 3),        # ceil(0,7)=1 mas ceil(7/3)=3 domina
 ])
 def test_formula_do_teto(n, m, esperado):
     assert calcular_teto(n, m) == esperado
 
 
+@pytest.mark.parametrize("n, m", [(20, 2), (50, 24), (3, 1), (1, 1), (7, 3), (100, 5)])
+def test_teto_sempre_da_capacidade(n, m):
+    """A capacidade `teto * M` nunca pode ficar abaixo de N: seria infeasible.
+    Com a fracao em 10% a folga e' menor que era com 30%, entao a garantia
+    passou a valer a pena testar em varios pontos, nao so' num caso."""
+    assert calcular_teto(n, m) * m >= n
+
+
 def test_horizonte_curto_continua_viavel():
-    """M=2, N=20: um teto de 30% daria capacidade 12 < 20 e o solver
+    """M=2, N=20: um teto de 10% daria capacidade 4 < 20 e o solver
     retornaria infeasible. O segundo termo do max existe para isto."""
     r = otimizar([0.30, 0.10], 20, GAS_USED)
     assert r.x.sum() == 20

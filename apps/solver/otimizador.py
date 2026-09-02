@@ -6,7 +6,7 @@ Formulacao fechada e testada (ver docs/registro-decisoes-tecnicas.md):
     variavel:    x_i = numero INTEIRO de transacoes na janela i  (decisao 3)
     objetivo:    minimizar  sum_i  x_i * GAS_USED * custo_i
     restricoes:  sum_i x_i = N
-                 0 <= x_i <= teto,  teto = max(ceil(0.3*N), ceil(N/M))  (decisao 6)
+                 0 <= x_i <= teto,  teto = max(ceil(0.1*N), ceil(N/M))  (decisoes 6 e 34)
     solver:      scipy.optimize.milp, backend HiGHS               (decisao 9)
 
 Deliberadamente AUSENTE: minimo por janela / inicio forcado. Foi testado via
@@ -42,19 +42,32 @@ class ResultadoOtimizacao:
                                     # executar_agora, para dizer o quanto seria pior
 
 
+# Fracao de N que uma unica janela pode receber.
+#
+# Era 0,3, calibrada por Monte Carlo sobre dado SINTETICO (decisao 6). Dado
+# sintetico nao tem a cauda pesada do gas real, e e' a cauda que quebra a
+# concentracao: o backtest sobre 120h de mainnet (decisao 34) mediu, na economia
+# AGREGADA com N=50, -32,9% em 24h e -6,3% em 12h com 0,3 -- ou seja, usar o
+# otimizador saia' mais caro que nao usa-lo. Com 0,1: -0,7% e +6,7%.
+FRACAO_MAXIMA_POR_JANELA = 0.1
+
+
 def calcular_teto(n_transacoes: int, n_janelas: int) -> int:
     """
-    teto = max( ceil(0,3 * N) , ceil(N / M) )
+    teto = max( ceil(0,1 * N) , ceil(N / M) )
 
-    O primeiro termo e' a protecao de risco calibrada por Monte Carlo (decisao 6):
-    sem teto o MILP concentra tudo na janela mais barata prevista, o que dobra o
-    pior caso quando a previsao erra.
+    O primeiro termo e' a protecao de risco: sem teto o MILP concentra tudo na
+    janela mais barata PREVISTA, e quando a previsao erra num pico -- gas tem
+    cauda pesada, 19x a mediana no corpus medido -- a perda e' enorme.
 
     O segundo termo existe so' para garantir VIABILIDADE em horizonte curto: com
-    M=2 e N=20, um teto de 30% daria capacidade 12 < 20 e o solver retornaria
+    M=2 e N=20, um teto de 10% daria capacidade 4 < 20 e o solver retornaria
     infeasible. Ele relaxa o teto apenas o minimo necessario.
     """
-    return max(math.ceil(0.3 * n_transacoes), math.ceil(n_transacoes / n_janelas))
+    return max(
+        math.ceil(FRACAO_MAXIMA_POR_JANELA * n_transacoes),
+        math.ceil(n_transacoes / n_janelas),
+    )
 
 
 def otimizar(custo_i, n_transacoes: int, gas_used: int,
