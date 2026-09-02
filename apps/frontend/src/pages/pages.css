@@ -591,3 +591,123 @@
   margin-right: 0.45rem;
   vertical-align: middle;
 }
+
+/* =========================================================================
+   Índice de consistência (tela de Análise)
+   ========================================================================= */
+
+.indice {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.indice__valor {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.indice__valor--alta { color: var(--barato); }
+.indice__valor--media { color: var(--text-100); }
+.indice__valor--baixa { color: var(--caro); }
+
+.indice__escala {
+  margin-left: 0.15rem;
+  font-size: 0.42em;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-600);
+}
+
+.indice__legenda {
+  flex: 1;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-300);
+}
+
+/* 24 barras: altura carrega a consistência, cor carrega o preço. Duas
+   variáveis numa figura só -- é o cruzamento que responde se a hora barata
+   também é a hora confiável. */
+.barras24 {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 76px;
+}
+
+/* Marca dos 50 pontos -- o ponto em que o desvio padrão da hora tem o tamanho
+   da própria média. Sem essa referência as barras, que na prática vivem entre
+   35 e 80, leem como um bloco quase uniforme; com ela o olho vê de que lado da
+   linha cada hora cai. Truncar o eixo resolveria o contraste mentindo sobre a
+   escala, então a linha entra no lugar disso. */
+.barras24::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 50%;
+  border-top: 1px dashed rgba(150, 185, 235, 0.28);
+  pointer-events: none;
+}
+
+.barras24__hora {
+  flex: 1 1 0;
+  min-width: 0;
+  height: max(var(--altura), 4px);
+  border-radius: 3px;
+  transition: height 0.3s ease;
+}
+
+.barras24__hora--barato {
+  background: linear-gradient(180deg, var(--barato), rgba(74, 222, 154, 0.45));
+}
+
+.barras24__hora--caro {
+  background: linear-gradient(180deg, var(--caro), rgba(255, 157, 110, 0.45));
+}
+
+/* Hora sem dois dias de amostra: traço na base, para as 24 horas continuarem
+   sendo lidas como uma escala completa. */
+.barras24__hora--vazia {
+  height: 4px;
+  background: rgba(150, 185, 235, 0.22);
+}
+
+.barras24__eixo {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.5rem 0 1rem;
+  font-size: 0.7rem;
+  color: var(--text-600);
+}
+
+.barras24__legenda {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.ponto {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  margin-left: 0.45rem;
+}
+
+.ponto:first-child { margin-left: 0; }
+.ponto--barato { background: var(--barato); }
+.ponto--caro { background: var(--caro); }
+
+.ponto--linha {
+  width: 12px;
+  height: 0;
+  border-top: 1px dashed rgba(150, 185, 235, 0.5);
+  border-radius: 0;
+}
