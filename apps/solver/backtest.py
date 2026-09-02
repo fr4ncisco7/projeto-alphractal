@@ -381,6 +381,9 @@ def main() -> None:
     p.add_argument("--saida", type=Path, default=None, help="grava o relatorio em markdown")
     p.add_argument("--tetos", type=int, nargs="+", default=None,
                    help="em vez da tabela padrao, varre estes tetos por janela")
+    p.add_argument("--minimo-agregado", type=float, default=None,
+                   help="falha (exit 1) se alguma celula ficar abaixo deste agregado; "
+                        "usado em CI como trava de regressao")
     args = p.parse_args()
 
     serie = carregar_corpus(args.corpus)
@@ -392,9 +395,30 @@ def main() -> None:
             varrer_tetos(serie, h, n, args.tetos)
             for h in args.horizontes for n in args.enes
         )
+        resultados = None
     else:
-        tabela = resumir(rodar(serie, args.horizontes, args.enes))
+        resultados = rodar(serie, args.horizontes, args.enes)
+        tabela = resumir(resultados)
     print(tabela)
+
+    # Trava de regressao. O corpus e' congelado em git e as dependencias sao
+    # pinadas, entao o resultado e' deterministico -- da' para exigir um piso.
+    # Existe para impedir que uma "melhoria" no estimador ou na formulacao passe
+    # sem que ninguem perceba que o otimizador voltou a perder dinheiro.
+    if args.minimo_agregado is not None:
+        if resultados is None:
+            raise SystemExit("--minimo-agregado nao vale com --tetos")
+        piores = [
+            (n, h, _economia_agregada(obs))
+            for (n, h), obs in sorted(resultados.items())
+            if obs and _economia_agregada(obs) < args.minimo_agregado
+        ]
+        if piores:
+            print(f"\nFALHOU: agregado abaixo de {args.minimo_agregado:+.1f}%")
+            for n, h, v in piores:
+                print(f"  N={n} horizonte={h}h -> {v:+.2f}%")
+            raise SystemExit(1)
+        print(f"\nok: todas as celulas com agregado >= {args.minimo_agregado:+.1f}%")
 
     if args.saida:
         args.saida.write_text(

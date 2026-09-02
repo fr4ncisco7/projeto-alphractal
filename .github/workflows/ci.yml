@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+# Um push novo cancela a execução anterior do mesmo branch: sem isto, uma
+# sequência de commits enfileira builds que ninguém vai ler.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  solver:
+    name: Solver (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"          # mesma da imagem de produção
+          cache: pip
+          cache-dependency-path: apps/solver/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+        working-directory: apps/solver
+      - run: pytest
+        working-directory: apps/solver
+
+  backtest:
+    name: Backtest (trava de regressão)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: apps/solver/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+        working-directory: apps/solver
+      # O corpus é congelado em git e as dependências são pinadas, então o
+      # resultado é determinístico. O piso impede que uma mudança no estimador
+      # ou na formulação faça o otimizador voltar a perder dinheiro sem que
+      # ninguém perceba -- foi exatamente o estado em que ele viveu até a
+      # decisão 34. A margem para o pior valor atual (-0,7%) é deliberada:
+      # apertar demais transforma ruído numérico em build vermelho.
+      - run: python backtest.py --minimo-agregado -2.0
+        working-directory: apps/solver
+
+  backend:
+    name: Backend Node (tsc + vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/backend-node/package-lock.json
+      - run: npm ci
+        working-directory: apps/backend-node
+      # `tsc --noEmit` é o passo que mais paga aqui: o `dev` roda com tsx, que
+      # NÃO faz checagem de tipos, então um erro de tipagem só aparecia quando
+      # alguém rodava o build à mão -- e um deles ficou meses escondido.
+      - run: npx tsc --noEmit
+        working-directory: apps/backend-node
+      - run: npm test
+        working-directory: apps/backend-node
+      - run: npm run build
+        working-directory: apps/backend-node
+
+  frontend:
+    name: Frontend (tsc + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: npm ci
+        working-directory: apps/frontend
+      - run: npx tsc --noEmit
+        working-directory: apps/frontend
+      - run: npm run build
+        working-directory: apps/frontend
