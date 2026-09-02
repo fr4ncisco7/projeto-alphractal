@@ -16,7 +16,7 @@ export function AppShell() {
 
       <aside className="sidebar">
         <NavLink to="/" className="sidebar__brand" aria-label="Alphractal">
-          <Logo size={44} />
+          <Logo size={68} />
         </NavLink>
 
         <nav className="sidebar__nav" aria-label="Navegação principal">
