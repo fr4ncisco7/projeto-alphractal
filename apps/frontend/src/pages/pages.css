@@ -529,68 +529,6 @@
   color: var(--text-600);
 }
 
-/* Fita de janelas: 24 barras lado a lado mostram a forma da recomendação de
-   uma vez só. A lista linha-a-linha da tela do otimizador exige ler hora por
-   hora; aqui o objetivo é reconhecer o padrão, não consultar valores. */
-.fita__barras {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 84px;
-}
-
-.fita__janela {
-  flex: 1 1 0;
-  min-width: 0;
-  /* Janelas sem transação viram um traço na base: some do primeiro plano sem
-     desaparecer, para as 24 horas continuarem sendo lidas como uma escala. */
-  height: 4px;
-  border-radius: 3px;
-  background: rgba(150, 185, 235, 0.22);
-  transition: height 0.3s ease;
-}
-
-.fita__janela--usada {
-  height: max(var(--altura), 6px);
-  background: linear-gradient(180deg, var(--blue-400), var(--blue-600));
-}
-
-.fita__eixo {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  font-size: 0.7rem;
-  color: var(--text-600);
-}
-
-/* Variante de 4 colunas: o painel "Estado da coleta" tem quatro leituras, e
-   sete colunas deixariam três células vazias. */
-.faixa--quatro {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-@media (max-width: 680px) {
-  .faixa--quatro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-/* Dentro da faixa, o painel já desenha a moldura -- a segunda borda em volta
-   ficava dobrada. */
-.panelbox > .faixa {
-  border: none;
-  background: none;
-}
-
-.panelbox > .faixa .faixa__item {
-  padding: 0.35rem 1rem 0.35rem 0;
-}
-
-.faixa__valor .pulso {
-  display: inline-block;
-  margin-right: 0.45rem;
-  vertical-align: middle;
-}
-
 /* =========================================================================
    Índice de consistência (tela de Análise)
    ========================================================================= */
@@ -898,4 +836,39 @@
   font-weight: 400;
   letter-spacing: 0;
   color: var(--text-600);
+}
+
+/* ---------- curva rotulada (tela inicial) ---------- */
+
+/* Espaço para os rótulos de contagem, que ficam acima das barras.
+   Precisa ser MARGEM, não padding: a altura das barras é percentual e resolve
+   contra a content box, enquanto o `bottom: %` da linha do "preço de agora"
+   resolve contra a padding box. Com padding aqui, as duas referências divergem
+   e a linha saía 8 px acima do topo da barra da janela 0 -- que é justamente a
+   barra que ela deveria tocar. */
+.curva--rotulada {
+  height: 132px;
+  margin-top: 1.1rem;
+}
+
+.curva__janela {
+  position: relative;
+}
+
+.curva__contagem {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.25rem;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--barato);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Na tela inicial a figura divide a linha com o número da economia. */
+.resumo__figura {
+  min-width: 0;
 }

@@ -915,6 +915,41 @@ Dois defeitos apareceram na verificação em navegador, nenhum visível no códi
   objetivo logo acima já estabeleceu que i vai de 0 a M−1, e repetir num corpo menor só
   produzia dois borrões. É a abreviação usual.
 
+## 41. A figura do plano na tela inicial media a coisa errada
+
+A tela inicial trazia uma fita de 24 barras cuja **altura era a quantidade de transações**
+por janela. Duas falhas:
+
+- **Nada na tela dizia isso.** Ninguém olha barras ao longo do tempo e conclui "número de
+  transações" — a leitura automática é preço. A figura pedia uma legenda que não existia.
+- **As janelas vazias viravam um traço de 4 px** na base, que lia como eixo, não como
+  "janela com zero transações".
+
+Trocada pela **curva de custo previsto**, a mesma da tela do Solver, agora extraída para
+`components/CurvaPrevista.tsx` e usada nas duas telas. Altura é preço — a leitura que a
+pessoa já faz — e a quantidade virou rótulo em cima da barra escolhida. A linha tracejada no
+custo da janela 0 marca o preço de executar agora, e as barras verdes ficam visivelmente
+abaixo dela: a figura passa a explicar a decisão em vez de apenas exibi-la.
+
+Ganhou também a legenda que faltava, dizendo o que é altura, o que é a cor, o que é o número
+e o que é a linha. **Um gráfico que precisa de legenda e não tem não é um gráfico ruim — é um
+gráfico incompleto.**
+
+Dois defeitos encontrados na verificação:
+
+- **A linha do "preço de agora" saía 8 px acima do topo da barra da janela 0** — justamente a
+  barra que ela deveria tocar. O `padding-top` aberto para os rótulos fez as duas medidas
+  divergirem: altura de barra é percentual e resolve contra a *content box*, enquanto o
+  `bottom: %` da linha resolve contra a *padding box*. Virou margem, e a diferença foi a
+  zero (medido no navegador, não estimado).
+- **Um `replace` de texto falhou em silêncio** ao inserir a legenda, porque o alvo real tinha
+  `role="status"` e o meu padrão não. A legenda simplesmente não apareceu, sem erro nenhum.
+  Refeito com asserção — silêncio em substituição de texto é o modo de falha mais barato de
+  evitar e o mais caro de descobrir depois.
+
+As 62 linhas de CSS da fita foram removidas junto: código morto em folha de estilo não
+aparece em typecheck nem em teste.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e

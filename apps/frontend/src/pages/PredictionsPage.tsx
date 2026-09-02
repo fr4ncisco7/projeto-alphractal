@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { Panel } from "../components/Panel";
+import { CurvaPrevista } from "../components/CurvaPrevista";
 import { FormulaObjetivo } from "../components/FormulaObjetivo";
 import { JustificativaDasHoras } from "../components/JustificativaDasHoras";
 import { LinhaDoTempo, montarLinha } from "../components/LinhaDoTempo";
@@ -10,7 +11,7 @@ import { apiRequest } from "../lib/api";
 import { endpoints } from "../lib/endpoints";
 import { ApiError } from "../lib/errors";
 import { dataHora, gwei, horaCurta, percentual, usd } from "../lib/formato";
-import type { JanelaPlano, Otimizacao, SerieCalendario } from "../types";
+import type { Otimizacao, SerieCalendario } from "../types";
 import "./pages.css";
 
 /** Transferência simples de ETH. O valor mais comum e um padrão seguro. */
@@ -307,7 +308,7 @@ export function PredictionsPage() {
                 title="Por que este plano"
                 hint="Custo previsto de cada janela, e as que o otimizador escolheu"
               >
-                <CurvaPrevista plano={resultado.plano} />
+                <CurvaPrevista plano={resultado.plano} historicoAte={resultado.historico_ate} />
                 <p className="metric__hint">
                   Previsão a partir de {resultado.historico_horas} h de histórico,
                   de {dataHora(resultado.historico_de)} a {dataHora(resultado.historico_ate)}.
@@ -351,59 +352,6 @@ function relogioDaJanela(historicoAte: string, janela: number): string {
   return new Date(t).toLocaleString("pt-BR", {
     weekday: "short", hour: "2-digit", minute: "2-digit",
   });
-}
-
-/**
- * A curva de custo previsto, com as janelas escolhidas destacadas.
- *
- * Desenhada com barras em CSS, e não com uma biblioteca de gráfico: são 24
- * valores discretos, é o mesmo idioma já usado na tela de Análise e na fita da
- * tela inicial, e evita carregar mais 170 kB numa tela que não tinha gráfico.
- *
- * A linha tracejada no custo da janela 0 é o que faz a figura explicar o plano:
- * ela marca o preço de executar agora, e o otimizador só tem o que ganhar nas
- * barras abaixo dela. Quando nenhuma barra fica abaixo, a trava de dominância
- * manda executar imediatamente -- e a figura mostra o porquê sem precisar de
- * texto.
- */
-function CurvaPrevista({ plano }: { plano: JanelaPlano[] }) {
-  const maximo = Math.max(...plano.map((j) => j.custo_i_gwei));
-  const agora = plano[0]?.custo_i_gwei ?? 0;
-  const escolhidas = plano.filter((j) => j.x > 0).length;
-
-  if (!Number.isFinite(maximo) || maximo <= 0) return null;
-
-  return (
-    <>
-      <div
-        className="curva"
-        style={{ "--nivel-agora": `${(agora / maximo) * 100}%` } as React.CSSProperties}
-        role="img"
-        aria-label={`Custo previsto em ${plano.length} janelas; ${escolhidas} escolhidas`}
-      >
-        {plano.map((j) => (
-          <span
-            key={j.janela}
-            className={`curva__janela${j.x > 0 ? " curva__janela--escolhida" : ""}`}
-            style={{ "--altura": `${(j.custo_i_gwei / maximo) * 100}%` } as React.CSSProperties}
-            title={
-              `${j.janela === 0 ? "agora" : `+${j.janela}h`}: ` +
-              `${gwei(j.custo_i_gwei)} gwei/gas` +
-              (j.x > 0 ? ` · ${j.x} transações aqui` : "")
-            }
-          />
-        ))}
-      </div>
-      <p className="curva__eixo">
-        <span>agora</span>
-        <span className="curva__legenda">
-          <i className="ponto ponto--escolhida" aria-hidden="true" /> escolhida
-          <i className="ponto ponto--linha" aria-hidden="true" /> preço de agora
-        </span>
-        <span>+{plano.length - 1}h</span>
-      </p>
-    </>
-  );
 }
 
 function Campo({ rotulo, valor, onChange, ajuda, ...resto }: {

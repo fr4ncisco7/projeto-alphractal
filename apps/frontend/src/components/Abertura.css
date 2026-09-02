@@ -61,8 +61,8 @@
 
 /* ---------- trilho de progresso ---------- */
 
-/* Segmentos, e não uma barra contínua: é o mesmo vocabulário da fita de
-   janelas do otimizador e das 24 horas da Análise, e casa com a ideia de
+/* Segmentos, e não uma barra contínua: é o mesmo vocabulário das barras por
+   janela do otimizador e das 24 horas da Análise, e casa com a ideia de
    blocos que atravessa o produto inteiro. */
 .trilho {
   display: flex;

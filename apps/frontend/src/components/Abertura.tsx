@@ -4,7 +4,7 @@ import { Backdrop } from "./Backdrop";
 import { Logo } from "./Logo";
 import "./Abertura.css";
 
-/** Segmentos da barra. Ecoa a fita de janelas do painel -- mesma linguagem. */
+/** Segmentos da barra. Ecoa as barras por janela do painel -- mesma linguagem. */
 const SEGMENTOS = 28;
 /** Duração do fade de saída. Precisa bater com a transição em Abertura.css. */
 const SAIDA_MS = 420;

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { CurvaPrevista } from "../components/CurvaPrevista";
 import { Panel } from "../components/Panel";
 import { ResourceState } from "../components/ResourceState";
 import { useResource } from "../hooks/useResource";
@@ -316,7 +317,6 @@ function PlanoVitrine({ plano, erro, carregando }: {
     );
   }
 
-  const janelas = plano.plano.filter((j) => j.x > 0);
   // A recomendação vem do solver, não de inferir pelo sinal do percentual: com
   // a trava de dominância a economia é 0 nos dois casos de "não distribua"
   // (empate e plano descartado), e só o campo distingue os dois.
@@ -326,17 +326,6 @@ function PlanoVitrine({ plano, erro, carregando }: {
     plano.custo_baseline_t0_gwei > 0
       ? (plano.custo_distribuido_gwei / plano.custo_baseline_t0_gwei - 1) * 100
       : 0;
-  /**
-   * Escala da fita.
-   *
-   * Era o teto por janela, o que funcionava enquanto todo x_i o respeitava.
-   * Com a trava de dominância o plano devolvido pode ser "tudo agora", e aí
-   * x_0 = N > teto: a barra ia a 200% da altura e vazava por cima do painel.
-   */
-  const escalaDaFita = Math.max(
-    plano.teto_por_janela,
-    ...plano.plano.map((j) => j.x),
-  );
 
   return (
     <Panel
@@ -384,27 +373,29 @@ function PlanoVitrine({ plano, erro, carregando }: {
           )}
         </div>
 
-        {/* Fita de 24 janelas: mostra a FORMA da recomendação de uma vez, em vez
-            de uma lista que exige ler hora por hora. */}
-        <div className="fita">
-          <div className="fita__barras" role="img"
-               aria-label={`Distribuição em ${janelas.length} das ${plano.n_janelas} janelas`}>
-            {plano.plano.map((j) => (
-              <span
-                key={j.janela}
-                className={`fita__janela${j.x > 0 ? " fita__janela--usada" : ""}`}
-                style={{ "--altura": `${(j.x / escalaDaFita) * 100}%` } as React.CSSProperties}
-                title={`${j.janela === 0 ? "agora" : `+${j.janela}h`}: ${j.x} tx a ${gwei(j.custo_i_gwei)} gwei/gas`}
-              />
-            ))}
-          </div>
-          <p className="fita__eixo">
-            <span>agora</span>
-            <span>{janelas.length} janelas usadas · teto de {plano.teto_por_janela}</span>
-            <span>+{plano.n_janelas - 1}h</span>
-          </p>
+        {/* A curva de custo previsto, a mesma da tela do Solver.
+            Antes aqui havia uma fita cuja altura era a QUANTIDADE de transações
+            por janela -- e nada na tela dizia isso. Ninguém adivinha "número de
+            transações" olhando barras, e as janelas vazias viravam um tracinho
+            que parecia eixo. Altura como preço é a leitura que qualquer pessoa
+            já faz de barras ao longo do tempo; a quantidade virou rótulo. */}
+        <div className="resumo__figura">
+          <CurvaPrevista
+            plano={plano.plano}
+            historicoAte={plano.historico_ate}
+            mostrarContagem
+          />
         </div>
       </div>
+
+      {/* A figura precisa dizer o que mede. Sem esta linha, "altura" e "número
+          em cima da barra" ficam por conta do leitor adivinhar. */}
+      <p className="metric__hint">
+        Cada barra é uma das próximas {plano.n_janelas} horas, e a altura é o custo de gas
+        previsto para ela. As verdes são as janelas que o otimizador escolheu; o número em
+        cima diz quantas das {PEDIDO_VITRINE.n_transacoes} transações vão em cada uma. A
+        linha tracejada é o preço previsto para agora — só há o que ganhar abaixo dela.
+      </p>
 
       {plano.aviso && <p className="metric__hint" role="status">⚠ {plano.aviso}</p>}
     </Panel>
