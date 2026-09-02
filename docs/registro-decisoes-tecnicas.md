@@ -583,6 +583,72 @@ mesmo. Se a previsão errar, o ganho realizado é outro. A trava garante que o s
 recomenda o pior dos dois caminhos *segundo a própria previsão* — não que o +31,31% se
 concretize. Medir isso é função do backtest, ainda pendente.
 
+## 32. Backfill não atualiza as agregações contínuas sozinho
+
+`gas_1min` e `gas_1h` têm `materialized_only = false` (decisão 24), o que faz o dado novo
+aparecer sem esperar refresh. Isso vale só para o que chega **depois** da marca d'água de
+materialização. O backfill escreve **atrás** dela, em buckets que a Timescale já considera
+calculados — e não os recalcula.
+
+O sintoma é traiçoeiro: `bloco_gas` fica correto, o backfill relata sucesso, e o painel e o
+solver continuam enxergando o buraco. Em 02/09/2026 o backfill recuperou 6.193 blocos e
+fechou o vão de 20h41 na hypertable; `gas_1h` seguiu com um buraco de **17h** até o
+`refresh_continuous_aggregate` manual. Só então a série horária foi de 96h para 121h.
+
+`backfill.ts` passou a reprocessar as duas agregações ao final, quando gravou alguma coisa,
+com margem de um dia para trás para cobrir o bucket parcial na borda. `CALL` não roda dentro
+de transação — pelo `pool.query` do node-postgres não há transação implícita, o que foi
+verificado antes de fechar o caminho.
+
+**Consequência prática, e é boa:** dá para desligar a máquina. Um buraco de uma noite é
+recuperável por backfill enquanto estiver dentro das ~93h de alcance do `eth_feeHistory`
+(decisão 18). O procedimento ao voltar é `docker compose up -d` e
+`docker compose exec backend-node npm run backfill -- <horas>`.
+
+---
+
+## 33. Backtest do otimizador: mediana boa, cauda perigosa
+
+`apps/solver/backtest.py` + `scripts/backtest.sh`, sobre um corpus congelado de 120h de
+mainnet em `apps/solver/tests/dados/mainnet_1h.csv`. Não fala com o banco — roda em CI e é
+reproduzível. Resultado completo em `docs/backtest-otimizador.md`.
+
+**O método.** Walk-forward: para cada hora com 48h de treino antes e horizonte inteiro
+depois, o plano nasce da previsão e é **cobrado pelo preço real**. É essa linha que separa o
+backtest do `economia_pct` do endpoint, em que o modelo se avalia com a própria previsão.
+Quatro estratégias: `agora` (baseline), `plano`, `oráculo` (o mesmo MILP com custos reais,
+sob as mesmas restrições) e `uniforme`.
+
+**O resultado, N=50, 49 origens:**
+
+| horizonte | plano (mediana) | p25 | oráculo | uniforme | captura | plano ≥ agora |
+|---|---|---|---|---|---|---|
+| 6h | +0,0% | −19,6% | +8,0% | −28,4% | 0% | 36/49 |
+| 12h | +0,0% | −48,0% | +26,6% | −73,7% | 43% | 33/49 |
+| 24h | **+20,4%** | **−601,1%** | +50,1% | −65,4% | **76%** | 28/49 |
+
+**A mediana defende o produto: +20,4% em 24h, capturando 76% do que a previsão perfeita
+conseguiria.** E a formulação bate o ingênuo com folga em todos os cortes — distribuir de
+qualquer jeito perde de 24% a 74%, então o ganho vem do MILP, não de espalhar.
+
+**A cauda o condena: p25 de −601%,** e em apenas 28 de 49 origens seguir o plano não piorou a
+situação. A causa é uma hora a 2,41 gwei (19× a mediana) que o estimador previu em ~0,05 —
+erro de 45×. O MILP concentrou 15 das 50 transações ali. Gas tem cauda pesada e Holt-Winters
+sem tendência não vê pico nenhum.
+
+**A trava de dominância (decisão 31) não protege contra isso**, e é importante não confundir
+as duas coisas: ela compara plano e baseline pelos custos **previstos**. Quando a previsão
+erra, o plano aprovado por ela ainda pode sair muito pior na realidade.
+
+Uma varredura preliminar de teto sobre o corpus anterior de 96h levou a mediana de −544%
+(teto 15) para −0,1% (teto 3) — espalhar mais reduz a exposição ao pico. **Não recalibrar a
+decisão 6 a partir disso ainda:** aquela varredura é de outro corpus, e falta ver o que
+acontece com a mediana boa das 120h. É a próxima medição, não uma conclusão.
+
+**Limites do resultado, e são grandes:** 120h e 49 origens; uma única hora de pico domina a
+cauda inteira; o estimador roda com menos de uma semana de histórico contra as ~4 semanas que
+a decisão 8 pede, com cada dia da semana aparecendo uma vez só.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
@@ -590,10 +656,9 @@ concretize. Medir isso é função do backtest, ainda pendente.
   `docs/estado-do-projeto.md` pedia "índice engenheirado" no piso mínimo; o que foi entregue
   é um índice diferente do previsto, com fórmula fechada e defensável — vale dizer isso na
   demo em vez de deixar parecer que o item saiu igual ao planejado
-- **Backtest histórico** — não existe (`apps/solver/backtest*` ausente). É o "teto desejado" da
-  definição de pronto, é o que produz o número quantificado de economia para a apresentação e,
-  desde a decisão 31, é a **única** forma de saber se a economia prevista pelo otimizador se
-  concretiza — hoje ele avalia a si mesmo com o próprio estimador
+- ~~Backtest histórico~~ — feito (decisão 33). O que ele **abriu**: a cauda de −601% em 24h
+  precisa de tratamento antes de o otimizador poder ser recomendado para prazos longos, e a
+  varredura de teto sobre as 120h ainda não foi refeita
 - Recalibrar teto (decisão 6) com dado histórico real
 - Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado
   sintético; hoje há ~95h de mainnet capturadas, suficiente para o fator de dia da semana ficar
