@@ -3,14 +3,14 @@
 Corpus: 120h contíguas de mainnet, 28/08 04:00 a 02/09 03:00 UTC.
 Treino mínimo 48h, `gas_used` 21,000.
 
-| N | horizonte | origens | economia do plano (mediana, p25–p75) | agregado | oráculo | uniforme | captura | plano ≥ agora |
+| N | horizonte | origens | plano agregado | (mediana, p25–p75) | oráculo | uniforme | captura | plano ≥ agora |
 |---|---|---|---|---|---|---|---|---|
-| 10 | 6h | 49 | **+0.0%** (-19.6 – +26.6) | -0.6% | +8.0% | -24.1% | 0% | 36/49 |
-| 10 | 12h | 49 | **+0.0%** (-48.0 – +40.0) | -19.2% | +26.6% | -72.0% | 43% | 33/49 |
-| 10 | 24h | 49 | **+20.4%** (-601.1 – +60.5) | -32.9% | +50.1% | -72.0% | 76% | 28/49 |
-| 50 | 6h | 49 | **+0.0%** (-19.6 – +26.6) | -0.6% | +8.0% | -28.4% | 0% | 36/49 |
-| 50 | 12h | 49 | **+0.0%** (-48.0 – +40.0) | -19.2% | +26.6% | -73.7% | 43% | 33/49 |
-| 50 | 24h | 49 | **+20.4%** (-601.1 – +60.5) | -32.9% | +50.1% | -65.4% | 76% | 28/49 |
+| 10 | 6h | 49 | **+3.1%** | +0.0% (+0.0 – +6.3) | +42.2% | -2.4% | 7% | 41/49 |
+| 10 | 12h | 49 | **+1.9%** | +0.0% (+0.0 – +0.0) | +45.4% | -4.5% | 4% | 40/49 |
+| 10 | 24h | 49 | **-0.7%** | +0.0% (-132.8 – +52.4) | +65.4% | -4.5% | -1% | 33/49 |
+| 50 | 6h | 49 | **+1.6%** | +0.0% (+0.0 – +0.0) | +35.6% | -2.6% | 5% | 42/49 |
+| 50 | 12h | 49 | **+1.9%** | +0.0% (+0.0 – +0.0) | +45.4% | -5.4% | 4% | 40/49 |
+| 50 | 24h | 49 | **-0.7%** | +0.0% (-132.8 – +52.4) | +65.4% | -3.8% | -1% | 33/49 |
 
 ## Como ler
 
@@ -20,8 +20,9 @@ Treino mínimo 48h, `gas_used` 21,000.
 - **oráculo** — o mesmo MILP resolvido com os custos reais, sob as mesmas restrições (teto,
   integralidade, trava de dominância). Não é um limite teórico inatingível: é o que este
   otimizador teria feito com previsão perfeita.
-- **captura** — quanto da economia alcançável o plano ficou. Separa o erro do estimador do
-  mérito da formulação.
+- **captura** — quanto da economia alcançável o plano ficou, **também no agregado**. Uma
+  versão anterior comparava plano em agregado com oráculo em mediana — bases diferentes, e o
+  número saía sem sentido (dava "76%" onde o agregado era −45%).
 - **uniforme** — N/M por janela. O ingênuo que a formulação precisa superar.
 - **agregado** — economia sobre a **soma** dos custos de todas as origens. Responde "usando a
   ferramenta em todas as ocasiões, gastaria mais ou menos no total?". É a métrica que decide,
@@ -32,22 +33,31 @@ Treino mínimo 48h, `gas_used` 21,000.
 
 ## O que estes números dizem
 
-**Em 24h a mediana é boa e a cauda é perigosa.** Economia realizada mediana de **+20,4%**,
-capturando **76%** do que a previsão perfeita teria conseguido (+50,1%). Mas o percentil 25
-é **−601%**: num quarto das origens o plano custou 7× o baseline, e só em **28 de 49** ele
-não piorou a situação.
+Com o teto recalibrado para 10% de N (decisão 34), N=50:
 
-**A causa da cauda é o pico.** O corpus tem uma hora a 2,41 gwei — 19× a mediana de 0,127 — que
-o estimador previu em ~0,05 (erro de 45×). O MILP concentrou 15 das 50 transações ali. Gas tem
-cauda pesada, e Holt-Winters com sazonalidade multiplicativa e sem tendência não vê pico algum.
+| horizonte | plano | oráculo | uniforme | captura | plano ≥ agora |
+|---|---|---|---|---|---|
+| 6h | **+1,6%** | +35,6% | −2,6% | 5% | 42/49 |
+| 12h | **+1,9%** | +45,4% | −5,4% | 4% | 40/49 |
+| 24h | **−0,7%** | +65,4% | −3,8% | −1% | 33/49 |
 
-**Em 6h não há o que ganhar.** O próprio oráculo só encontra +8,0%. A trava de dominância
-manda executar agora na maioria das origens, e faz certo — a captura de 0% não é falha da
-previsão, é ausência de oportunidade.
+**O otimizador deixou de perder dinheiro.** Antes da recalibração o agregado era −0,6%,
+−19,2% e −32,9% nos mesmos cortes. Agora é positivo em 6h e 12h e empata em 24h. A fração de
+origens em que seguir o plano não piorou a situação subiu de 36/49 para 42/49 (6h) e de 28/49
+para 33/49 (24h).
 
-**A formulação supera o ingênuo com folga.** O plano uniforme perde de 24% a 74% em todos os
-cortes. Distribuir de qualquer jeito é muito pior que não distribuir; é o MILP que produz a
-diferença.
+**E deixou de ganhar quase tudo junto.** O oráculo encontra de +35% a +65% disponíveis; o
+plano captura **4% a 7%**. O teto apertado tirou a exposição ao pico e, no mesmo movimento,
+tirou a capacidade de explorar as horas genuinamente baratas.
+
+**A restrição que morde agora é o estimador, não a formulação.** A distância entre +1,9% e
++45,4% em 12h é inteiramente erro de previsão: o MILP com custos reais, sob as mesmas
+restrições, acharia 24× mais economia. Mexer no teto não fecha essa distância — só escolhe
+entre perder muito e ganhar pouco.
+
+**A formulação continua batendo o ingênuo**, mas por pouco agora: o uniforme perde de 2,4% a
+5,4%, contra os 24%–74% de antes. Com o teto em 10% o plano do MILP e o espalhamento uniforme
+se aproximam, o que é esperado — teto baixo força distribuição.
 
 ## Limites deste resultado
 
@@ -95,22 +105,22 @@ O teto da decisão 6 — `max(30% de N, N/M)` — foi calibrado por Monte Carlo 
 
 ### A leitura
 
-**A mediana de +20,4% em 24h era uma miragem.** No agregado, o teto atual de 15 gasta
-**32,9% a mais** que executar tudo imediatamente. O caso típico ganha; o total perde, porque
-as perdas são muito maiores em magnitude do que os ganhos. Apresentar a mediana sozinha teria
-sido enganoso.
+**A mediana de +20,4% em 24h era uma miragem.** No agregado, o teto antigo de 15 gastava
+**32,9% a mais** que executar tudo imediatamente. O caso típico ganhava; o total perdia,
+porque as perdas eram muito maiores em magnitude do que os ganhos. Apresentar a mediana
+sozinha teria sido enganoso.
 
 **O teto de 30% de N é permissivo demais para gas real.** O sinal é o mesmo nos dois
-horizontes: `teto = 5` (10% de N) é o melhor agregado em 24h (−0,7%, empate técnico) e em 12h
-(**+6,7%**, o único ponto claramente lucrativo de toda a varredura). O teto atual dá −32,9% e
-−6,3% nos mesmos cortes.
+horizontes: `teto = 5` (10% de N) é o melhor agregado em 24h (−0,7%) e em 12h (+6,7%, o único
+ponto claramente lucrativo de toda a varredura).
 
 **A cauda é o que o teto controla.** Em 24h o p25 vai de −75,9% (teto 3) a −713,1% (teto 20),
-monotonicamente. Concentrar em horas previstas baratas só compensa quando a previsão acerta,
-e o pico de 19× é exatamente onde ela erra mais.
+monotonicamente. Concentrar em horas previstas baratas só compensa quando a previsão acerta, e
+o pico de 19× é exatamente onde ela erra mais.
 
-**A captura não serve para escolher o teto.** Ela é máxima em 12 (80%) — um dos piores
-agregados. Mede quanto do ganho alcançável o plano pegou, não quanto dinheiro sobrou.
+**Mas nenhum teto resolve o problema de fundo.** A captura é sempre baixa ou negativa: 15% no
+melhor ponto (teto 5, 12h). O teto escolhe entre perder muito e ganhar pouco — quem decide
+quanto há para ganhar é a qualidade da previsão.
 
 ## O que fazer com isso
 

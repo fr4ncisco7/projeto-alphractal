@@ -621,11 +621,15 @@ sob as mesmas restrições) e `uniforme`.
 
 **O resultado, N=50, 49 origens:**
 
-| horizonte | plano (mediana) | p25 | oráculo | uniforme | captura | plano ≥ agora |
+| horizonte | plano agregado | mediana | p25 | oráculo | captura | plano ≥ agora |
 |---|---|---|---|---|---|---|
-| 6h | +0,0% | −19,6% | +8,0% | −28,4% | 0% | 36/49 |
-| 12h | +0,0% | −48,0% | +26,6% | −73,7% | 43% | 33/49 |
-| 24h | **+20,4%** | **−601,1%** | +50,1% | −65,4% | **76%** | 28/49 |
+| 6h | −0,6% | +0,0% | −19,6% | +42,2% | −1% | 36/49 |
+| 12h | −19,2% | +0,0% | −48,0% | +45,4% | −42% | 33/49 |
+| 24h | **−32,9%** | +20,4% | **−601,1%** | +65,4% | **−45%** | 28/49 |
+
+> A primeira versão desta tabela trazia "captura 76%" em 24h. Era a mediana das capturas por
+> origem, apresentada ao lado de um agregado — bases diferentes. Na mesma base do agregado a
+> captura é **−45%**. A métrica misturada quase virou manchete de apresentação.
 
 **A mediana de +20,4% em 24h é uma miragem, e quase entrou na apresentação como resultado.**
 No **agregado** — economia sobre a soma dos custos de todas as origens — o otimizador com o
@@ -672,6 +676,48 @@ Mede quanto do ganho alcançável o plano pegou, não quanto dinheiro sobrou.
 cauda inteira; o estimador roda com menos de uma semana de histórico contra as ~4 semanas que
 a decisão 8 pede, com cada dia da semana aparecendo uma vez só.
 
+## 34. Recalibração do teto: 30% → 10% de N
+
+A decisão 6 fixou o teto por janela em ~30% de N, calibrado por Monte Carlo sobre dado
+**sintético**. O backtest da decisão 33 mediu sobre mainnet e a varredura de teto foi
+inequívoca nos dois horizontes (economia agregada, N=50):
+
+| teto | 12h | 24h |
+|---|---|---|
+| 3 | — | −6,0% |
+| **5 (10% de N)** | **+6,7%** | **−0,7%** |
+| 8 | +3,7% | −15,7% |
+| 10 | +0,6% | −14,1% |
+| 15 (30% de N) | −6,3% | −32,9% |
+| 20 | −10,1% | −46,3% |
+
+`FRACAO_MAXIMA_POR_JANELA` passou de `0.3` para `0.1`. O segundo termo do `max`, `ceil(N/M)`,
+fica intacto — é o que garante viabilidade em horizonte curto, e com a fração menor ele passa
+a dominar em mais casos, então ganhou teste parametrizado próprio (`teto * M >= N` em 6
+pontos, não mais um caso só).
+
+**O efeito, medido depois de aplicar** (agregado, N=50):
+
+| horizonte | antes | depois | plano ≥ agora |
+|---|---|---|---|
+| 6h | −0,6% | **+1,6%** | 36/49 → 42/49 |
+| 12h | −19,2% | **+1,9%** | 33/49 → 40/49 |
+| 24h | −32,9% | **−0,7%** | 28/49 → 33/49 |
+
+**O otimizador deixou de perder dinheiro — e não passou a ganhar quase nada.** A captura vai
+a 4%–7%: o oráculo encontra de +35% a +65% disponíveis sob as mesmas restrições, e o plano
+pega uma fração. O teto apertado tirou a exposição ao pico e, no mesmo movimento, tirou a
+capacidade de explorar as horas genuinamente baratas.
+
+**A conclusão que importa: a restrição que morde é o estimador, não a formulação.** A
+distância entre +1,9% e +45,4% em 12h é inteiramente erro de previsão. Nenhum valor de teto
+fecha isso — o teto só escolhe entre perder muito e ganhar pouco. Com menos de uma semana de
+histórico contra as ~4 semanas que a decisão 8 pede, é o resultado esperado.
+
+Nota metodológica: o 10% é o melhor ponto medido, não um ótimo demonstrado. A grade foi
+grossa (3, 5, 8, 10, 15, 20) sobre 49–61 origens de 5 dias, com um único pico dominando a
+cauda. Vale refazer com ~4 semanas de corpus.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
@@ -682,8 +728,11 @@ a decisão 8 pede, com cada dia da semana aparecendo uma vez só.
 - ~~Backtest histórico~~ — feito (decisão 33). O que ele **abriu**: no agregado o otimizador
   hoje **perde dinheiro** (−32,9% em 24h com o teto atual). A varredura aponta `teto ≈ 10% de
   N`, mas recalibrar a decisão 6 é decisão de produto — pendente
-- **Recalibrar o teto (decisão 6)** — a evidência da decisão 33 está medida e aponta para ~10%
-  de N; falta a decisão de aplicar, e mais corpus para confirmar
+- ~~Recalibrar o teto (decisão 6)~~ — feito (decisão 34): 30% → 10% de N. Refazer com ~4
+  semanas de corpus e grade mais fina
+- **Qualidade do estimador é o gargalo** (decisão 34) — o oráculo acha +45% em 12h e o plano
+  captura 4%. Nenhum ajuste de teto fecha essa distância; é previsão, e previsão precisa de
+  histórico (decisão 8 pede ~4 semanas, temos 5 dias)
 - Revalidar o estimador (decisões 8 e 17) com dado real de gas — toda a validação atual é em dado
   sintético; hoje há ~95h de mainnet capturadas, suficiente para o fator de dia da semana ficar
   fraco (menos de 1 semana completa) mas já dá para checar a sazonalidade de 24h

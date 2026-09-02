@@ -26,7 +26,9 @@ Não estão importados aqui de propósito (são longos) — leia sob demanda qua
 
 - **MILP**, não LP contínuo: `x_i` = número inteiro de transações na janela `i`
 - Objetivo: `minimizar Σ x_i × GAS_USED × custo_i`
-- Restrições: `Σ x_i = N`; `0 ≤ x_i ≤ teto`, onde `teto = max(⌈0,3×N⌉, ⌈N/M⌉)` (M = nº de janelas do horizonte — o segundo termo garante viabilidade em deadlines curtos)
+- Restrições: `Σ x_i = N`; `0 ≤ x_i ≤ teto`, onde `teto = max(⌈0,1×N⌉, ⌈N/M⌉)` (M = nº de janelas do horizonte — o segundo termo garante viabilidade em deadlines curtos)
+- **A fração era 0,3 e virou 0,1** em 02/09/2026, recalibrada pelo backtest sobre mainnet: com 30% a economia agregada era −32,9% em 24h (o otimizador saía mais caro que não usá-lo); com 10% ficou +1,9% em 12h e −0,7% em 24h. Ver decisão 34
+- **Trava de dominância:** se o plano distribuído custar mais que executar tudo agora, o solver devolve o baseline. `economia_pct` nunca é negativa (decisão 31)
 - **Sem** restrição de mínimo/início forçado — testado via Monte Carlo e descartado (piorava o resultado; ver decisão 7 no registro)
 - Câmbio ETH/USD tratado como constante dentro do horizonte de decisão — testado, erro pequeno (ver decisão 4)
 - Solver: `scipy.optimize.milp` (não `linprog`, não PuLP/OR-Tools)
