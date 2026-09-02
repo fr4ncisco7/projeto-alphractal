@@ -1,0 +1,215 @@
+/* Abertura: a primeira tela da aplicação, no lugar do login. */
+
+.abertura {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: var(--ink-900);
+  isolation: isolate;
+  transition: opacity 0.42s ease, transform 0.42s ease;
+}
+
+/* O painel já está montado e desenhado por baixo -- a saída só descobre. */
+.abertura--saindo {
+  opacity: 0;
+  transform: scale(1.03);
+  pointer-events: none;
+}
+
+.abertura__miolo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(30rem, 100%);
+  text-align: center;
+  animation: abertura-entrada 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes abertura-entrada {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.abertura__marca {
+  filter: drop-shadow(0 0 34px rgba(47, 124, 246, 0.45));
+  animation: abertura-respiro 2.6s ease-in-out infinite alternate;
+}
+
+@keyframes abertura-respiro {
+  from { opacity: 0.72; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1.02); }
+}
+
+.abertura__titulo {
+  margin-top: 1.25rem;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.abertura__assinatura {
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-500);
+}
+
+/* ---------- trilho de progresso ---------- */
+
+/* Segmentos, e não uma barra contínua: é o mesmo vocabulário da fita de
+   janelas do otimizador e das 24 horas da Análise, e casa com a ideia de
+   blocos que atravessa o produto inteiro. */
+.trilho {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  margin: 2rem 0 1.6rem;
+}
+
+.trilho__seg {
+  flex: 1 1 0;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(150, 185, 235, 0.14);
+  transition: background 0.35s ease, box-shadow 0.35s ease;
+}
+
+.trilho__seg--aceso {
+  background: linear-gradient(180deg, var(--blue-300), var(--blue-500));
+  box-shadow: 0 0 12px -2px rgba(77, 162, 255, 0.75);
+}
+
+/* ---------- lista de checagens ---------- */
+
+.checagens {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.checagem {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  /* Item ainda em verificação fica recuado no contraste: a lista inteira
+     acesa de uma vez não diria o que já terminou. */
+  opacity: 0.55;
+  transition: opacity 0.3s ease;
+}
+
+.checagem--ok,
+.checagem--falhou {
+  opacity: 1;
+}
+
+.checagem__sinal {
+  display: grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.checagem--ok .checagem__sinal {
+  background: var(--barato-fraco);
+  color: var(--barato);
+}
+
+.checagem--falhou .checagem__sinal {
+  background: var(--caro-fraco);
+  color: var(--caro);
+}
+
+.checagem__giro {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid rgba(150, 185, 235, 0.3);
+  border-top-color: var(--blue-400);
+  border-radius: 50%;
+  animation: abertura-giro 0.75s linear infinite;
+}
+
+@keyframes abertura-giro {
+  to { transform: rotate(360deg); }
+}
+
+.checagem__rotulo {
+  color: var(--text-300);
+  white-space: nowrap;
+}
+
+.checagem__detalhe {
+  overflow: hidden;
+  color: var(--text-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- parede: backend fora do ar ---------- */
+
+.abertura__parede {
+  width: 100%;
+  margin-top: 1.6rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(255, 157, 110, 0.28);
+  border-radius: 12px;
+  background: var(--caro-fraco);
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-300);
+}
+
+.abertura__parede code {
+  padding: 0.1rem 0.3rem;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 0.95em;
+}
+
+.abertura__retry {
+  margin-top: 0.8rem;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--field-border);
+  border-radius: 9px;
+  font-size: 0.78rem;
+  color: var(--text-100);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.abertura__retry:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 157, 110, 0.5);
+}
+
+/* O respiro e o giro são decorativos; quem pediu menos movimento fica com a
+   tela parada, e o conteúdo continua legível. */
+@media (prefers-reduced-motion: reduce) {
+  .abertura__marca,
+  .checagem__giro,
+  .abertura__miolo {
+    animation: none;
+  }
+}
+
+/* Todas as checagens resolvidas, mas a essencial falhou: o trilho cheio não
+   pode continuar dizendo "pronto" em azul. */
+.trilho--falhou .trilho__seg--aceso {
+  background: linear-gradient(180deg, var(--caro), rgba(255, 157, 110, 0.5));
+  box-shadow: 0 0 12px -3px rgba(255, 157, 110, 0.6);
+}

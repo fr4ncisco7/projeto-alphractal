@@ -1,25 +1,3 @@
-// --- autenticação ----------------------------------------------------------
-// O backend do Fees Monitor não tem autenticação: estes tipos existem para a
-// casca de login do shell da plataforma, que roda contra o backend simulado.
-// Quando a Alphractal plugar o login real, é aqui que o contrato dela entra.
-
-export type User = {
-  id: string;
-  name: string;
-  email: string;
-  plan: string;
-};
-
-export type Credentials = {
-  identifier: string;
-  password: string;
-};
-
-export type LoginResponse = {
-  token: string;
-  user: User;
-};
-
 /**
  * Contratos da API do Fees Monitor.
  *

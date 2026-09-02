@@ -245,11 +245,10 @@
   line-height: 1.5;
 }
 
-/* O botão do formulário. As definições de .btn e .btn--light vivem em
-   LoginPage.css, que só é carregado na tela de login -- então precisam existir
-   aqui também, senão o botão do otimizador sai sem estilo nenhum. Mantidas
-   idênticas de propósito: se divergirem, o mesmo botão fica diferente em duas
-   telas. Candidatas a subir para ui.css num momento de faxina. */
+/* O botão do formulário do otimizador. Estas regras eram uma cópia das que
+   viviam em LoginPage.css; com a tela de login removida, esta passou a ser a
+   única definição de .btn no projeto. Segue restrita a `.stack >` porque é o
+   único lugar que usa a classe -- se aparecer um segundo, sobe para ui.css. */
 .stack > .btn {
   align-self: flex-start;
   min-height: 2.95rem;

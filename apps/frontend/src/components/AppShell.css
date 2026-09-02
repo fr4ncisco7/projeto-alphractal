@@ -84,70 +84,33 @@
   padding-top: 1.5rem;
 }
 
-.usercard {
+/* Rodapé da barra: identifica o módulo, não um usuário. Sem login não há
+   quem identificar, e o cartão de conta que vivia aqui exibia nome e plano
+   inventados pelo backend simulado. */
+.modulo {
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.45rem 0.5rem;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.6rem;
   border: 1px solid var(--field-border);
   border-radius: var(--radius-field);
   background: rgba(255, 255, 255, 0.02);
-}
-
-.usercard__avatar {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 1.85rem;
-  height: 1.85rem;
-  border-radius: 7px;
-  background: linear-gradient(150deg, var(--blue-600), #0b1f5c);
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.usercard__info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
   line-height: 1.25;
 }
 
-.usercard__info strong {
-  font-size: 0.76rem;
-  font-weight: 500;
+.modulo strong {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   color: var(--text-100);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.usercard__info small {
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
+.modulo small {
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-600);
-}
-
-.usercard__exit {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 1.75rem;
-  height: 1.75rem;
-  margin-left: auto;
-  border-radius: 7px;
-  color: var(--text-600);
-  transition:
-    color 0.2s ease,
-    background 0.2s ease;
-}
-
-.usercard__exit:hover {
-  color: #ff8f9b;
-  background: rgba(255, 143, 155, 0.1);
 }
 
 /* ---------- content ---------- */
@@ -211,7 +174,9 @@
     padding-top: 0;
   }
 
-  .usercard__info {
+  /* Na barra horizontal o logotipo já identifica o produto -- repetir o nome
+     do módulo ao lado dele só rouba largura da navegação. */
+  .modulo {
     display: none;
   }
 }

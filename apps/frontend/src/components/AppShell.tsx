@@ -1,5 +1,4 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
 import { Backdrop } from "./Backdrop";
 import { Logo } from "./Logo";
 import "./AppShell.css";
@@ -11,8 +10,6 @@ const navigation = [
 ];
 
 export function AppShell() {
-  const { user, signOut } = useAuth();
-
   return (
     <div className="app">
       <Backdrop variant="app" />
@@ -37,25 +34,16 @@ export function AppShell() {
           ))}
         </nav>
 
+        {/* Sem login não há usuário para identificar aqui, e um cartão com nome
+            e plano inventados seria pior que nada na frente do parceiro. Quando
+            o módulo entrar na plataforma, este canto é da casca da Alphractal.
+            O estado ao vivo do sistema tem lugar próprio: o pulso do destaque
+            na tela inicial e o painel "Estado da coleta". */}
         <div className="sidebar__footer">
-          <div className="usercard">
-            <span className="usercard__avatar" aria-hidden="true">
-              {initials(user?.name)}
-            </span>
-            <span className="usercard__info">
-              <strong>{user?.name ?? "Conta"}</strong>
-              <small>{user?.plan ?? "—"}</small>
-            </span>
-            <button
-              type="button"
-              className="usercard__exit"
-              onClick={() => void signOut()}
-              aria-label="Sair da conta"
-              title="Sair"
-            >
-              <ExitIcon />
-            </button>
-          </div>
+          <p className="modulo">
+            <strong>Fees Monitor</strong>
+            <small>Inteli Blockchain × Alphractal</small>
+          </p>
         </div>
       </aside>
 
@@ -63,35 +51,5 @@ export function AppShell() {
         <Outlet />
       </main>
     </div>
-  );
-}
-
-function initials(name?: string) {
-  if (!name) return "?";
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function ExitIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
-      <path d="M10 17l-5-5 5-5" />
-      <path d="M5 12h11" />
-    </svg>
   );
 }

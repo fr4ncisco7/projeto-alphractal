@@ -7,12 +7,6 @@
  * atravessar a fronteira entre serviços.
  */
 export const endpoints = {
-  // Autenticação -- atendida só pelo backend simulado; o backend do Fees
-  // Monitor não tem login. Mantida para a casca do shell continuar de pé.
-  login: "/auth/login",
-  logout: "/auth/logout",
-  me: "/auth/me",
-
   /** Estado do banco, da ingestão, do solver e nº de conexões SSE. */
   saude: "/health",
   /** Série de 1 minuto para o gráfico ao vivo. Aceita `?minutos=`. */

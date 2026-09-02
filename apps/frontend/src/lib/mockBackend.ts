@@ -1,14 +1,11 @@
 import { endpoints } from "./endpoints";
 import { ApiError } from "./errors";
 import type {
-  Credentials,
   EstatisticasDia,
-  LoginResponse,
   Otimizacao,
   PedidoOtimizacao,
   PontoSerie,
   Saude,
-  User,
 } from "../types";
 
 /**
@@ -173,23 +170,6 @@ function otimizar(pedido: PedidoOtimizacao): Otimizacao {
   };
 }
 
-const usuarioDemo: User = {
-  id: "usr_demo",
-  name: "João Pedro",
-  email: "joao@alphractal.com",
-  plan: "Pro",
-};
-
-function login(body: unknown): LoginResponse {
-  const { identifier, password } = (body ?? {}) as Partial<Credentials>;
-  if (!identifier || !password) throw new ApiError("Informe suas credenciais.", 400);
-  if (password.length < 6) throw new ApiError("E-mail ou senha incorretos.", 401);
-  return {
-    token: `mock.${btoa(identifier).replace(/=+$/, "")}`,
-    user: { ...usuarioDemo, email: identifier.includes("@") ? identifier : usuarioDemo.email },
-  };
-}
-
 const saude: Saude = {
   status: "ok",
   blocos: 27_900,
@@ -217,13 +197,6 @@ export async function mockRequest<T>(
   const params = new URLSearchParams(query ?? "");
 
   switch (rota) {
-    case endpoints.login:
-      return login(body) as T;
-    case endpoints.logout:
-      return null as T;
-    case endpoints.me:
-      return usuarioDemo as T;
-
     case endpoints.saude:
       return { ...saude, ultimo_bloco_em: new Date().toISOString() } as T;
 
