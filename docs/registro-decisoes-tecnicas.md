@@ -852,6 +852,33 @@ largura não é o recurso escasso. O botão some e a barra volta ao estado expan
 preferência salva disser o contrário — senão o modo estreito herdaria um estado que não faz
 sentido nele.
 
+## 39. Landing page e a separação entre apresentação e produto
+
+`/` passou a ser a apresentação do projeto; o painel foi para `/painel/*`. O conteúdo sai da
+documentação — problema (planejamento §2), os três fluxos e a stack (arquitetura §2 e §3), a
+formulação e o estimador (decisões 3, 6, 17), os números do backtest (decisão 33) e o escopo
+negativo do TAP (planejamento §3).
+
+**A landing fica FORA da `Abertura`, e isso é o ponto da mudança.** É a página que alguém
+abre para entender o que é o projeto *antes* de subir contêiner nenhum — professor, parceiro,
+alguém que clonou o repositório. Se ela dependesse da verificação de prontidão, ficaria
+inacessível justamente para quem ainda não rodou nada. Verificado desligando o
+`backend-node`: a landing abre inteira, o distintivo de estado ao vivo simplesmente não
+aparece, e o botão para o painel leva à parede da `Abertura` com a instrução de subir a
+stack — que é o comportamento certo para cada um dos dois.
+
+Todo dado dinâmico da landing é opcional e falha em silêncio. Um erro de rede não pode virar
+mensagem na tela de quem só queria ler o que o projeto faz.
+
+**A marca da barra lateral passou a levar de volta à apresentação.** Antes apontava para a
+primeira aba, o que era redundante — a navegação entre abas está logo abaixo — e não havia
+como voltar da aplicação para a página do projeto.
+
+**Os números na landing são os medidos, com a ressalva junto.** +1,9% de economia agregada ao
+lado dos +45,4% que a previsão perfeita acharia, e a frase de que a distância entre os dois é
+erro de previsão. Publicar só o primeiro número seria vender melhor e mentir; publicar só o
+segundo seria vender o que não existe.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e

@@ -23,9 +23,9 @@ function lerPreferencia(): boolean {
 }
 
 const navigation = [
-  { to: "/", label: "Tela Inicial", icone: <IconePulso /> },
-  { to: "/analise", label: "Análise", icone: <IconeBarras /> },
-  { to: "/predicoes", label: "Solver", icone: <IconeControles /> },
+  { to: "/painel", label: "Tela Inicial", icone: <IconePulso /> },
+  { to: "/painel/analise", label: "Análise", icone: <IconeBarras /> },
+  { to: "/painel/predicoes", label: "Solver", icone: <IconeControles /> },
 ];
 
 export function AppShell() {
@@ -48,7 +48,11 @@ export function AppShell() {
       <Backdrop variant="app" />
 
       <aside className="sidebar">
-        <NavLink to="/" className="sidebar__brand" aria-label="Alphractal">
+        {/* A marca leva à apresentação do projeto, não à primeira aba: a
+            navegação entre abas já está logo abaixo, e daqui não havia como
+            voltar para a landing. */}
+        <NavLink to="/" className="sidebar__brand" aria-label="Sobre o projeto"
+                 title="Sobre o projeto">
           <Logo size={recolhida ? 38 : 68} />
         </NavLink>
 
@@ -57,7 +61,7 @@ export function AppShell() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === "/"}
+              end={item.to === "/painel"}
               className={({ isActive }) =>
                 `navlink${isActive ? " navlink--active" : ""}`
               }

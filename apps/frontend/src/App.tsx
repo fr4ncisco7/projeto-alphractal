@@ -3,29 +3,41 @@ import { Abertura } from "./components/Abertura";
 import { AppShell } from "./components/AppShell";
 import { AnalysisPage } from "./pages/AnalysisPage";
 import { HomePage } from "./pages/HomePage";
+import { LandingPage } from "./pages/LandingPage";
 import { PredictionsPage } from "./pages/PredictionsPage";
 
 /**
- * Não há rota de login nem guarda de rota.
+ * Duas entradas, com exigências opostas.
  *
- * O Fees Monitor é um módulo da aba "Fees" da plataforma da Alphractal: a
- * autenticação é da plataforma, e quem chega até aqui já passou por ela. Uma
- * tela de login própria seria uma cerimônia sem backend por trás -- o serviço
- * de gas expõe dado público, sem usuário nem sessão. No lugar dela, a
- * `Abertura` verifica se o sistema tem o que precisa para abrir.
+ * `/` é a apresentação do projeto: conteúdo estático, que precisa abrir mesmo
+ * com a stack desligada -- é a página que alguém abre para entender o que é
+ * isto antes de subir contêiner nenhum. Por isso fica FORA da `Abertura`.
+ *
+ * `/painel/*` é o produto, e aí a `Abertura` faz sentido: ela verifica banco,
+ * ingestão e solver antes de deixar o painel aparecer com caixas de erro.
+ *
+ * Não há rota de login: a autenticação é da plataforma da Alphractal, e quem
+ * chega ao módulo já passou por ela (decisão 30).
  */
 export default function App() {
   return (
-    <Abertura>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<HomePage />} />
-          <Route path="analise" element={<AnalysisPage />} />
-          <Route path="predicoes" element={<PredictionsPage />} />
-        </Route>
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Abertura>
+      <Route
+        path="/painel"
+        element={
+          <Abertura>
+            <AppShell />
+          </Abertura>
+        }
+      >
+        <Route index element={<HomePage />} />
+        <Route path="analise" element={<AnalysisPage />} />
+        <Route path="predicoes" element={<PredictionsPage />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

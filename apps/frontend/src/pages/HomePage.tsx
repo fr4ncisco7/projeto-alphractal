@@ -342,7 +342,7 @@ function PlanoVitrine({ plano, erro, carregando }: {
     <Panel
       title={titulo}
       hint={dica}
-      actions={<Link className="statebox__retry" to="/predicoes">Abrir otimizador</Link>}
+      actions={<Link className="statebox__retry" to="/painel/predicoes">Abrir otimizador</Link>}
     >
       <div className="resumo">
         {/* Economia negativa NÃO é economia: é o quanto o plano custaria a MAIS

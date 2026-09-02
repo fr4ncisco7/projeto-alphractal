@@ -1,0 +1,393 @@
+/* Apresentação do projeto. Layout próprio, sem a casca do painel. */
+
+.landing {
+  position: relative;
+  min-height: 100%;
+  isolation: isolate;
+}
+
+.landing__topo,
+.landing__miolo,
+.landing__rodape {
+  position: relative;
+  z-index: 1;
+  width: min(72rem, 100% - 2.5rem);
+  margin-inline: auto;
+}
+
+.landing__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 0;
+}
+
+.landing__marca {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- botões ---------- */
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: transform 0.2s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.botao--grande {
+  padding: 0.85rem 1.7rem;
+  font-size: 0.98rem;
+}
+
+.botao--claro {
+  background: linear-gradient(180deg, #ffffff, #e9eef7);
+  color: #060a12;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 16px 34px -20px rgba(140, 190, 255, 0.85);
+}
+
+.botao--claro:hover { transform: translateY(-1px); }
+
+.botao--fantasma {
+  border: 1px solid var(--field-border);
+  color: var(--text-300);
+}
+
+.botao--fantasma:hover {
+  border-color: rgba(120, 170, 235, 0.45);
+  color: var(--text-100);
+}
+
+/* ---------- capa ---------- */
+
+.capa {
+  padding: clamp(3rem, 9vw, 6.5rem) 0 clamp(2.5rem, 6vw, 4.5rem);
+  max-width: 52rem;
+}
+
+.capa__acima {
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--blue-400);
+}
+
+.capa__titulo {
+  margin-top: 1.1rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5.4vw, 3.6rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.capa__texto {
+  margin-top: 1.3rem;
+  max-width: 40rem;
+  font-size: clamp(0.95rem, 1.6vw, 1.1rem);
+  line-height: 1.65;
+  color: var(--text-300);
+}
+
+.capa__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.capa__ativo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.8rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-600);
+}
+
+/* ---------- seções ---------- */
+
+.secao {
+  padding: clamp(2rem, 5vw, 3.5rem) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.secao__titulo {
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.secao__texto {
+  margin-top: 0.5rem;
+  max-width: 44rem;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text-500);
+}
+
+.secao__nota {
+  margin-top: 1.2rem;
+  max-width: 52rem;
+  font-size: 0.84rem;
+  line-height: 1.65;
+  color: var(--text-500);
+}
+
+.secao .grid { margin-top: 1.5rem; }
+
+/* ---------- cartões ---------- */
+
+.cartao {
+  padding: 1.4rem 1.5rem;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(13, 19, 32, 0.7), rgba(6, 10, 18, 0.7));
+}
+
+.cartao h3 {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.cartao p {
+  margin-top: 0.7rem;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--text-300);
+}
+
+.cartao__nota {
+  color: var(--text-600) !important;
+  font-size: 0.8rem !important;
+}
+
+.formula {
+  margin: 0.9rem 0;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: var(--blue-300);
+  overflow-x: auto;
+}
+
+/* ---------- fluxos ---------- */
+
+.fluxos {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.6rem;
+  padding: 0;
+  list-style: none;
+  counter-reset: fluxo;
+}
+
+.fluxo {
+  display: flex;
+  gap: 1.1rem;
+  padding: 1.3rem 1.5rem;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(13, 19, 32, 0.7), rgba(6, 10, 18, 0.7));
+}
+
+.fluxo__numero {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  background: rgba(47, 124, 246, 0.14);
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--blue-300);
+}
+
+.fluxo__titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.fluxo__ritmo {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--neutro-fraco);
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-500);
+}
+
+.fluxo p {
+  margin-top: 0.6rem;
+  font-size: 0.88rem;
+  line-height: 1.65;
+  color: var(--text-300);
+}
+
+.fluxo__nota {
+  color: var(--text-600) !important;
+  font-size: 0.8rem !important;
+  padding-left: 0.8rem;
+  border-left: 2px solid var(--hairline);
+}
+
+/* ---------- serviços ---------- */
+
+.servicos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: clamp(0.75rem, 1.5vw, 1.1rem);
+  margin-top: 1.5rem;
+}
+
+.servico {
+  padding: 1.2rem 1.3rem;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: rgba(8, 12, 20, 0.55);
+}
+
+.servico__nome {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--blue-300);
+}
+
+.servico__stack {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-600);
+}
+
+.servico__texto {
+  margin-top: 0.7rem;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--text-300);
+}
+
+/* ---------- medidas ---------- */
+
+.medida {
+  padding: 1.2rem 1.3rem;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: linear-gradient(165deg, rgba(13, 19, 32, 0.7), rgba(6, 10, 18, 0.7));
+}
+
+.medida__valor {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.medida__rotulo {
+  margin-top: 0.3rem;
+  font-size: 0.84rem;
+  color: var(--text-300);
+}
+
+.medida__nota {
+  margin-top: 0.45rem;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--text-600);
+}
+
+/* ---------- limites ---------- */
+
+.limites {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1.3rem;
+  padding: 0;
+  list-style: none;
+  max-width: 52rem;
+}
+
+.limites li {
+  position: relative;
+  padding-left: 1.5rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text-300);
+}
+
+.limites li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--text-600);
+}
+
+/* ---------- fechamento ---------- */
+
+.fechamento {
+  padding: clamp(3rem, 7vw, 5rem) 0;
+  border-top: 1px solid var(--hairline);
+  text-align: center;
+}
+
+.fechamento h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.2vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.fechamento p {
+  margin: 0.7rem auto 1.8rem;
+  max-width: 34rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-500);
+}
+
+/* ---------- rodapé ---------- */
+
+.landing__rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 1.6rem 0 2.5rem;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.76rem;
+  color: var(--text-600);
+}
