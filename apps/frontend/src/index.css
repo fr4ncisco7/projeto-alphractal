@@ -15,6 +15,15 @@
   --text-500: #8698b0;
   --text-600: #6b7c93;
 
+  /* Cor semântica: barato x caro. Antes o painel era azul em tudo, e a cor
+     não carregava informação nenhuma -- estas três dizem o que o número
+     significa, e valem para o destaque, o heatmap e as barras do plano. */
+  --barato: #4ade9a;
+  --barato-fraco: rgba(74, 222, 154, 0.12);
+  --caro: #ff9d6e;
+  --caro-fraco: rgba(255, 157, 110, 0.12);
+  --neutro-fraco: rgba(150, 185, 235, 0.1);
+
   --field-bg: rgba(9, 16, 28, 0.72);
   --field-border: rgba(140, 175, 225, 0.16);
   --hairline: rgba(150, 185, 235, 0.14);
