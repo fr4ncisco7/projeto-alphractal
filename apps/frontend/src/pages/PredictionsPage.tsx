@@ -107,30 +107,26 @@ export function PredictionsPage() {
           {resultado && (
             <>
               <Panel
-                title={resultado.economia_pct > 0 ? "Economia" : "Executar agora sai mais barato"}
+                title={resultado.executar_agora ? "Executar agora sai mais barato" : "Economia"}
                 hint={`Comparado a executar as ${resultado.plano.reduce((t, j) => t + j.x, 0)} transações agora`}
               >
                 <div className="grid grid--metrics">
                   <article className="metric">
-                    {/* O rótulo acompanha o sinal: "Economia: -US$ 0,39" obriga
-                        o leitor a decifrar que o negativo inverte o sentido da
-                        palavra. Com o valor negativo isto não é economia
-                        nenhuma -- é o custo extra de distribuir. */}
-                    <p className="metric__label">
-                      {resultado.economia_pct > 0 ? "Economia" : "Custo extra de distribuir"}
-                    </p>
+                    <p className="metric__label">Economia</p>
                     {/* Dólar em cima do percentual: é o número que decide. */}
                     <p className="metric__value">
                       {resultado.economia_usd !== null
-                        ? usd(Math.abs(resultado.economia_usd))
-                        : percentual(Math.abs(resultado.economia_pct), 2)}
+                        ? usd(resultado.economia_usd)
+                        : percentual(resultado.economia_pct, 2)}
                     </p>
                     <p className="metric__hint">
                       {resultado.economia_usd !== null &&
-                        `${percentual(Math.abs(resultado.economia_pct), 2)} · `}
-                      {resultado.economia_pct > 0
-                        ? "custo evitado ao distribuir a execução"
-                        : "a hora atual já é a mais barata prevista — o modelo está dizendo para executar agora"}
+                        `${percentual(resultado.economia_pct, 2)} · `}
+                      {resultado.executar_agora
+                        ? "a hora atual já é a mais barata prevista — o plano é executar tudo agora"
+                        : resultado.economia_pct > 0
+                          ? "custo evitado ao distribuir a execução"
+                          : "distribuir empata com executar agora no prazo pedido"}
                     </p>
                   </article>
                   <article className="metric">
@@ -153,12 +149,15 @@ export function PredictionsPage() {
                   </article>
                 </div>
 
-                {resultado.economia_pct < 0 && (
+                {resultado.executar_agora && (
                   <p className="metric__hint">
-                    Economia negativa não é erro: o teto de {resultado.teto_por_janela}{" "}
-                    transações por janela é uma proteção contra erro de previsão, e
-                    quando a hora atual já é a melhor ele obriga a espalhar para
-                    janelas piores.
+                    O otimizador montou uma distribuição que custaria{" "}
+                    {gwei(resultado.custo_distribuido_gwei)} gwei — mais que os{" "}
+                    {gwei(resultado.custo_baseline_t0_gwei)} de executar tudo agora — e a
+                    descartou. O teto de {resultado.teto_por_janela} transações por janela
+                    protege contra erro de previsão, mas quando a hora atual já é a melhor
+                    ele obriga a espalhar para janelas piores; nesse caso o plano devolvido
+                    é o de executar imediatamente.
                   </p>
                 )}
 

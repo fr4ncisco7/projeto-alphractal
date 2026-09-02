@@ -124,11 +124,19 @@ export type Otimizacao = {
   /** Custo de executar tudo agora -- a comparação que gera a economia. */
   custo_baseline_t0_gwei: number;
   /**
-   * Pode ser NEGATIVA, e isso não é erro: quando a hora atual já é a mais
-   * barata prevista, o teto de risco obriga a espalhar para janelas piores.
-   * É o modelo dizendo "execute agora".
+   * Nunca negativa (decisão 31).
+   *
+   * Quando o plano distribuído sairia mais caro que executar tudo agora -- o
+   * que acontece sempre que a hora atual é a mais barata do horizonte, porque
+   * o teto proíbe concentrar --, a trava de dominância do solver devolve o
+   * baseline no lugar do plano. Usar o otimizador nunca sai pior que não
+   * usá-lo; no pior caso, empata.
    */
   economia_pct: number;
+  /** A trava disparou: `plano` é "tudo agora", não uma distribuição. */
+  executar_agora: boolean;
+  /** O que o plano distribuído teria custado — o quanto seria pior. */
+  custo_distribuido_gwei: number;
   teto_por_janela: number;
   n_janelas: number;
   /** Presente quando o histórico está abaixo das 672h recomendadas. */
@@ -141,6 +149,6 @@ export type Otimizacao = {
   usd_por_eth: number | null;
   custo_total_usd: number | null;
   custo_baseline_t0_usd: number | null;
-  /** Negativo quando executar agora já era o melhor. Ver `economia_pct`. */
   economia_usd: number | null;
+  custo_distribuido_usd: number | null;
 };

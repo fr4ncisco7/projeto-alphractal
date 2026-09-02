@@ -143,8 +143,19 @@ function otimizar(pedido: PedidoOtimizacao): Otimizacao {
     if (restantes === 0) break;
   }
 
-  const custoTotal = x.reduce((t, xi, i) => t + xi * gasUsed * custos[i], 0);
+  const custoDistribuido = x.reduce((t, xi, i) => t + xi * gasUsed * custos[i], 0);
   const baseline = n * gasUsed * custos[0];
+
+  // A mesma trava de dominância do solver (decisão 31). O mock não precisa
+  // resolver o MILP, mas precisa ter o MESMO contrato de saída -- inclusive
+  // "nunca devolve plano pior que executar agora". Sem isso, quem desenvolve a
+  // interface sem Docker acaba desenhando para um comportamento que não existe.
+  const executarAgora = custoDistribuido > baseline * (1 + 1e-9);
+  if (executarAgora) {
+    x.fill(0);
+    x[0] = n;
+  }
+  const custoTotal = executarAgora ? baseline : custoDistribuido;
 
   const historicoHoras = 672;
   return {
@@ -156,7 +167,9 @@ function otimizar(pedido: PedidoOtimizacao): Otimizacao {
     })),
     custo_total_gwei: custoTotal,
     custo_baseline_t0_gwei: baseline,
-    economia_pct: 100 * (1 - custoTotal / baseline),
+    economia_pct: Math.max(0, 100 * (1 - custoTotal / baseline)),
+    executar_agora: executarAgora,
+    custo_distribuido_gwei: custoDistribuido,
     teto_por_janela: teto,
     n_janelas: janelas,
     aviso: null,
@@ -167,6 +180,7 @@ function otimizar(pedido: PedidoOtimizacao): Otimizacao {
     custo_total_usd: (custoTotal / 1e9) * USD_POR_ETH,
     custo_baseline_t0_usd: (baseline / 1e9) * USD_POR_ETH,
     economia_usd: ((baseline - custoTotal) / 1e9) * USD_POR_ETH,
+    custo_distribuido_usd: (custoDistribuido / 1e9) * USD_POR_ETH,
   };
 }
 

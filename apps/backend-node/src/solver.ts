@@ -28,7 +28,12 @@ export interface RespostaOtimizacao {
   plano: JanelaPlano[];
   custo_total_gwei: number;
   custo_baseline_t0_gwei: number;
+  /** Nunca negativa: a trava de dominância devolve o baseline quando o plano perde. */
   economia_pct: number;
+  /** A trava disparou: o plano devolvido é "tudo agora", não a distribuição. */
+  executar_agora: boolean;
+  /** O que o plano distribuído custaria — quanto seria pior, quando a trava dispara. */
+  custo_distribuido_gwei: number;
   teto_por_janela: number;
   n_janelas: number;
   aviso: string | null;

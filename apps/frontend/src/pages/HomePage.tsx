@@ -317,7 +317,26 @@ function PlanoVitrine({ plano, erro, carregando }: {
   }
 
   const janelas = plano.plano.filter((j) => j.x > 0);
-  const positiva = plano.economia_pct > 0;
+  // A recomendação vem do solver, não de inferir pelo sinal do percentual: com
+  // a trava de dominância a economia é 0 nos dois casos de "não distribua"
+  // (empate e plano descartado), e só o campo distingue os dois.
+  const distribuir = !plano.executar_agora && plano.economia_pct > 0;
+  // Quanto o plano descartado sairia pior que executar tudo agora.
+  const quantoPior =
+    plano.custo_baseline_t0_gwei > 0
+      ? (plano.custo_distribuido_gwei / plano.custo_baseline_t0_gwei - 1) * 100
+      : 0;
+  /**
+   * Escala da fita.
+   *
+   * Era o teto por janela, o que funcionava enquanto todo x_i o respeitava.
+   * Com a trava de dominância o plano devolvido pode ser "tudo agora", e aí
+   * x_0 = N > teto: a barra ia a 200% da altura e vazava por cima do painel.
+   */
+  const escalaDaFita = Math.max(
+    plano.teto_por_janela,
+    ...plano.plano.map((j) => j.x),
+  );
 
   return (
     <Panel
@@ -333,7 +352,7 @@ function PlanoVitrine({ plano, erro, carregando }: {
             recomendação -- que é a saída real do modelo -- e o percentual desce
             para nota, com o sinal e o sentido escritos. */}
         <div className="resumo__numero">
-          {positiva ? (
+          {distribuir ? (
             <>
               <p className="resumo__valor resumo__valor--bom">
                 {percentual(plano.economia_pct, 1)}
@@ -352,12 +371,15 @@ function PlanoVitrine({ plano, erro, carregando }: {
               <p className="resumo__legenda">
                 A hora atual já é a mais barata prevista no prazo.
               </p>
-              <p className="resumo__nota">
-                Distribuir custaria {percentual(Math.abs(plano.economia_pct), 1)} a mais
-                ({usd(plano.custo_total_usd)} contra {usd(plano.custo_baseline_t0_usd)}):
-                o teto de {plano.teto_por_janela} transações por janela impede concentrar
-                tudo numa hora só.
-              </p>
+              {plano.executar_agora && (
+                <p className="resumo__nota">
+                  O otimizador chegou a montar uma distribuição, mas ela custaria{" "}
+                  {percentual(quantoPior, 1)} a mais ({usd(plano.custo_distribuido_usd)}{" "}
+                  contra {usd(plano.custo_baseline_t0_usd)}) — o teto de{" "}
+                  {plano.teto_por_janela} transações por janela impede concentrar tudo
+                  numa hora só, então ela foi descartada.
+                </p>
+              )}
             </>
           )}
         </div>
@@ -371,7 +393,7 @@ function PlanoVitrine({ plano, erro, carregando }: {
               <span
                 key={j.janela}
                 className={`fita__janela${j.x > 0 ? " fita__janela--usada" : ""}`}
-                style={{ "--altura": `${(j.x / plano.teto_por_janela) * 100}%` } as React.CSSProperties}
+                style={{ "--altura": `${(j.x / escalaDaFita) * 100}%` } as React.CSSProperties}
                 title={`${j.janela === 0 ? "agora" : `+${j.janela}h`}: ${j.x} tx a ${gwei(j.custo_i_gwei)} gwei/gas`}
               />
             ))}

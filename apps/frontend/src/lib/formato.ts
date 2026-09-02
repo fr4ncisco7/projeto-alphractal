@@ -10,6 +10,9 @@
 
 export function gwei(valor: number | null | undefined): string {
   if (valor === null || valor === undefined || !Number.isFinite(valor)) return "—";
+  // Zero não tem magnitude para a regra abaixo interpretar, e caía no ramo mais
+  // preciso: "0,000000" em vez de "0,00".
+  if (valor === 0) return "0,00";
   const casas = valor >= 100 ? 0 : valor >= 10 ? 1 : valor >= 1 ? 2 : valor >= 0.01 ? 4 : 6;
   return valor.toLocaleString("pt-BR", {
     minimumFractionDigits: casas,
@@ -27,6 +30,9 @@ export function gwei(valor: number | null | undefined): string {
  */
 export function usd(valor: number | null | undefined): string {
   if (valor === null || valor === undefined || !Number.isFinite(valor)) return "—";
+  // Ver `gwei`: zero saía como "US$ 0,0000000". Aparecia de verdade na tela do
+  // otimizador, na economia exatamente nula da trava de dominância.
+  if (valor === 0) return usdFixo(0, 2);
   const abs = Math.abs(valor);
   const casas = abs >= 1 ? 2 : abs >= 0.01 ? 3 : abs >= 0.0001 ? 5 : 7;
   return valor.toLocaleString("pt-BR", {

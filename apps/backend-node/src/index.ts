@@ -314,6 +314,10 @@ app.post("/otimizar", async (req, res) => {
       custo_total_usd: emUsd(resultado.custo_total_gwei),
       custo_baseline_t0_usd: emUsd(resultado.custo_baseline_t0_gwei),
       economia_usd: emUsd(resultado.custo_baseline_t0_gwei - resultado.custo_total_gwei),
+      // Quanto o plano distribuído teria custado. Só é interessante quando a
+      // trava de dominância descartou esse plano, mas sai sempre: um campo que
+      // aparece e some conforme o caso é pior de consumir que um constante.
+      custo_distribuido_usd: emUsd(resultado.custo_distribuido_gwei),
     });
   } catch (erro) {
     if (erro instanceof SolverRecusouError) {
