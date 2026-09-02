@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { Panel } from "../components/Panel";
+import { useHistoricoDeExecucoes } from "../hooks/useHistoricoDeExecucoes";
 import { apiRequest } from "../lib/api";
 import { endpoints } from "../lib/endpoints";
 import { ApiError } from "../lib/errors";
-import { gwei, percentual, usd } from "../lib/formato";
-import type { Otimizacao } from "../types";
+import { dataHora, gwei, horaCurta, percentual, usd } from "../lib/formato";
+import type { JanelaPlano, Otimizacao } from "../types";
 import "./pages.css";
 
 /** Transferência simples de ETH. O valor mais comum e um padrão seguro. */
@@ -19,22 +20,26 @@ export function PredictionsPage() {
   const [resultado, setResultado] = useState<Otimizacao | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const historico = useHistoricoDeExecucoes();
 
   async function otimizar(evento: React.FormEvent) {
     evento.preventDefault();
     setCarregando(true);
     setErro(null);
 
+    const pedido = {
+      n_transacoes: Number(nTransacoes),
+      horas_ate_deadline: Number(horas),
+      gas_used: Number(gasUsed),
+    };
+
     try {
       const resposta = await apiRequest<Otimizacao>(endpoints.otimizar, {
         method: "POST",
-        body: {
-          n_transacoes: Number(nTransacoes),
-          horas_ate_deadline: Number(horas),
-          gas_used: Number(gasUsed),
-        },
+        body: pedido,
       });
       setResultado(resposta);
+      historico.registrar(pedido, resposta);
     } catch (causa) {
       // O backend explica o problema em português e às vezes traz a saída
       // prática junto (histórico defasado, histórico insuficiente). O api.ts
@@ -56,6 +61,10 @@ export function PredictionsPage() {
       />
 
       <div className="grid grid--split">
+        {/* Formulário e histórico numa coluna só: filhos diretos de
+            `.grid--split` viram colunas, e o histórico solto abria uma
+            terceira. */}
+        <div className="stack">
         <Panel title="Parâmetros" hint="O que você precisa executar, e até quando">
           <form className="stack" onSubmit={otimizar}>
             <Campo
@@ -94,6 +103,50 @@ export function PredictionsPage() {
             </p>
           )}
         </Panel>
+
+        {historico.execucoes.length > 0 && (
+          <Panel
+            title="Planos que você calculou"
+            hint="Guardados neste navegador · clique para recarregar os parâmetros"
+            actions={
+              <button type="button" className="statebox__retry" onClick={historico.limpar}>
+                Limpar
+              </button>
+            }
+          >
+            <ul className="execucoes">
+              {historico.execucoes.map((e) => (
+                <li key={e.em}>
+                  <button
+                    type="button"
+                    className="execucao"
+                    onClick={() => {
+                      setNTransacoes(String(e.n_transacoes));
+                      setHoras(String(e.horas_ate_deadline));
+                      setGasUsed(String(e.gas_used));
+                    }}
+                  >
+                    <span className="execucao__hora">{horaCurta(e.em)}</span>
+                    <span className="execucao__params">
+                      {e.n_transacoes} tx · {e.horas_ate_deadline} h ·{" "}
+                      {(e.gas_used / 1000).toLocaleString("pt-BR")}k gas
+                    </span>
+                    <span
+                      className={`tag tag--${e.executar_agora ? "neutro" : "up"}`}
+                    >
+                      {e.executar_agora
+                        ? "executar agora"
+                        : e.economia_usd !== null
+                          ? `${percentual(e.economia_pct, 1)} · ${usd(e.economia_usd)}`
+                          : percentual(e.economia_pct, 1)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
+        </div>
 
         <div className="stack">
           {!resultado && !erro && (
@@ -193,10 +246,76 @@ export function PredictionsPage() {
                   Histórico usado: {resultado.historico_horas} h.
                 </p>
               </Panel>
+
+              <Panel
+                title="Por que este plano"
+                hint="Custo previsto de cada janela, e as que o otimizador escolheu"
+              >
+                <CurvaPrevista plano={resultado.plano} />
+                <p className="metric__hint">
+                  Previsão a partir de {resultado.historico_horas} h de histórico,
+                  de {dataHora(resultado.historico_de)} a {dataHora(resultado.historico_ate)}.
+                  A linha tracejada é o preço previsto para agora: só há o que ganhar
+                  nas janelas abaixo dela.
+                </p>
+              </Panel>
             </>
           )}
         </div>
       </div>
+    </>
+  );
+}
+
+/**
+ * A curva de custo previsto, com as janelas escolhidas destacadas.
+ *
+ * Desenhada com barras em CSS, e não com uma biblioteca de gráfico: são 24
+ * valores discretos, é o mesmo idioma já usado na tela de Análise e na fita da
+ * tela inicial, e evita carregar mais 170 kB numa tela que não tinha gráfico.
+ *
+ * A linha tracejada no custo da janela 0 é o que faz a figura explicar o plano:
+ * ela marca o preço de executar agora, e o otimizador só tem o que ganhar nas
+ * barras abaixo dela. Quando nenhuma barra fica abaixo, a trava de dominância
+ * manda executar imediatamente -- e a figura mostra o porquê sem precisar de
+ * texto.
+ */
+function CurvaPrevista({ plano }: { plano: JanelaPlano[] }) {
+  const maximo = Math.max(...plano.map((j) => j.custo_i_gwei));
+  const agora = plano[0]?.custo_i_gwei ?? 0;
+  const escolhidas = plano.filter((j) => j.x > 0).length;
+
+  if (!Number.isFinite(maximo) || maximo <= 0) return null;
+
+  return (
+    <>
+      <div
+        className="curva"
+        style={{ "--nivel-agora": `${(agora / maximo) * 100}%` } as React.CSSProperties}
+        role="img"
+        aria-label={`Custo previsto em ${plano.length} janelas; ${escolhidas} escolhidas`}
+      >
+        {plano.map((j) => (
+          <span
+            key={j.janela}
+            className={`curva__janela${j.x > 0 ? " curva__janela--escolhida" : ""}`}
+            style={{ "--altura": `${(j.custo_i_gwei / maximo) * 100}%` } as React.CSSProperties}
+            title={
+              `${j.janela === 0 ? "agora" : `+${j.janela}h`}: ` +
+              `${gwei(j.custo_i_gwei)} gwei/gas` +
+              (j.x > 0 ? ` · ${j.x} transações aqui` : "")
+            }
+          />
+        ))}
+      </div>
+      <p className="curva__eixo">
+        <span>agora</span>
+        <span className="curva__legenda">
+          <i className="ponto ponto--escolhida" aria-hidden="true" /> escolhida
+          <i className="ponto ponto--linha" aria-hidden="true" /> preço de agora
+        </span>
+        <span>+{plano.length - 1}h</span>
+      </p>
     </>
   );
 }

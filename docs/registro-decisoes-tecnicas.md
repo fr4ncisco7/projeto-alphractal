@@ -764,6 +764,39 @@ voltar a perder dinheiro sem ninguém perceber — que foi o estado em que ele v
 decisão 34. A folga até o pior valor atual (−0,7%) é deliberada: piso apertado demais
 transforma ruído numérico em build vermelho.
 
+## 36. Tela do Solver: a curva que gerou o plano, e o histórico de execuções
+
+**"Por que este plano"** desenha o custo previsto das 24 janelas com as escolhidas
+destacadas, e uma linha tracejada no custo da janela 0. A linha é o que faz a figura
+explicar sozinha: ela marca o preço de executar agora, e o otimizador só tem o que ganhar
+nas barras abaixo dela. Quando nenhuma fica abaixo, a trava de dominância (decisão 31)
+manda executar imediatamente — e o gráfico mostra o porquê sem texto nenhum.
+
+Sem backend novo: `plano[].custo_i_gwei` já vinha na resposta e ninguém desenhava. Sem
+biblioteca nova também — são 24 valores discretos, e o idioma de barras em CSS já existe na
+Análise e na fita da tela inicial. Carregar as 170 kB do lightweight-charts numa tela que
+não tinha gráfico não se justificava.
+
+**Histórico das execuções em `localStorage`**, últimas 8, clicáveis para recarregar os
+parâmetros no formulário. A alternativa — tabela no banco — foi descartada pelo custo real,
+não pelo esforço de código: `db/init/` só roda com volume vazio, então uma tabela nova hoje
+custaria os ~38 mil blocos de mainnet já capturados, ou forçaria a migração para migrations
+versionadas no meio da semana da entrega. Para um histórico de conveniência, que serve para
+comparar duas rodadas na mesma sessão, o preço não fecha.
+
+A consequência está assumida e escrita na tela ("guardados neste navegador"): não é
+compartilhado nem auditável. Se a Alphractal quiser histórico de verdade, é backend — e aí
+a decisão de migrations vem junto.
+
+Toda leitura e escrita do `localStorage` vai em try/catch: ele lança em aba anônima com
+dados de site bloqueados, e um histórico de conveniência não pode derrubar a tela do
+otimizador. A leitura também filtra registros fora do formato, porque o conteúdo pode ter
+sido gravado por uma versão anterior do app.
+
+Um defeito de layout apareceu na verificação: filhos diretos de `.grid--split` viram
+colunas, então o painel de histórico solto abriu uma terceira coluna em vez de ficar abaixo
+do formulário. Resolvido envolvendo formulário e histórico numa `.stack`.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e

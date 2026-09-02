@@ -717,3 +717,103 @@
   font-size: clamp(1.4rem, 2.8vw, 1.8rem);
   color: var(--text-100);
 }
+
+/* =========================================================================
+   Tela do Solver: curva prevista e histórico de execuções
+   ========================================================================= */
+
+.curva {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 120px;
+}
+
+/* Preço previsto para a janela 0 -- o patamar que o plano precisa bater. */
+.curva::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--nivel-agora);
+  border-top: 1px dashed rgba(150, 185, 235, 0.45);
+  pointer-events: none;
+}
+
+.curva__janela {
+  flex: 1 1 0;
+  min-width: 0;
+  height: max(var(--altura), 2px);
+  border-radius: 3px 3px 0 0;
+  background: rgba(150, 185, 235, 0.2);
+  transition: background 0.2s ease;
+}
+
+.curva__janela--escolhida {
+  background: linear-gradient(180deg, var(--barato), rgba(74, 222, 154, 0.4));
+}
+
+.curva__eixo {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.5rem 0 0.9rem;
+  font-size: 0.7rem;
+  color: var(--text-600);
+}
+
+.curva__legenda {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.ponto--escolhida { background: var(--barato); }
+
+/* ---------- histórico de execuções ---------- */
+
+.execucoes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.execucao {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 9px;
+  font-size: 0.78rem;
+  text-align: left;
+  transition: background 0.2s ease;
+}
+
+.execucao:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.execucao__hora {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-600);
+}
+
+.execucao__params {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-300);
+}
+
+.tag--neutro {
+  background: var(--neutro-fraco);
+  color: var(--text-300);
+}
