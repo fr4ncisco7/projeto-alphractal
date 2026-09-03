@@ -1040,6 +1040,44 @@ preço de responder "execute agora" em um quarto das vezes. Um teto que dependes
 de janelas *genuinamente baratas* no horizonte, em vez de uma fração fixa de N, resolveria os
 dois — mas é mudança de formulação e precisa de corpus maior para calibrar.
 
+## 44. Benchmark para a apresentação: com solver e sem solver
+
+`apps/solver/benchmark.py` + `scripts/benchmark.sh`. Reaproveita o motor do backtest — mesmo
+walk-forward, plano nascido da previsão e cobrado pelo preço real — com outro recorte: o
+backtest responde "a formulação funciona?", o benchmark responde "quanto o usuário ganha ou
+perde?", e emite JSON para virar gráfico. Dados em `docs/benchmark-dados.json`.
+
+**Grade:** 4 volumes (10, 50, 200, 500) × 3 prazos (6, 12, 24 h) × 49 origens.
+
+**O resultado é praticamente invariante ao volume**, e isso não é acaso: o teto por janela é
+uma fração de N, então 10 e 500 transações produzem a mesma forma de plano. Vale dizer na
+apresentação — significa que o número serve para uma mesa pequena e para uma tesouraria.
+Percentuais também são invariantes ao `gas_used`, que é fator comum do custo de todas as
+estratégias; só os valores absolutos em dólar mudam.
+
+**A análise que mudou a apresentação foi a de sensibilidade ao pico.** Separando os cenários
+por um único critério — o horizonte contém alguma hora acima do percentil 99? — com N=50 e
+24 h:
+
+| | agregado | mediana | p05 | não piorou |
+|---|---|---|---|---|
+| todas as 49 origens | −0,74% | +0,0% | −733% | 33/49 |
+| excluindo horizontes com pico (29) | **+52,45%** | **+40,4%** | **−15,8%** | **27/29** |
+
+Duas horas em 120 — 1,7% do corpus — separam um empate de uma economia de metade do custo.
+Isso **não é um número para vender**: excluir os piores casos é legítimo para *diagnosticar*,
+porque mostra que a perda tem causa única e identificada, e ilegítimo para *prometer*. O
+documento diz isso explicitamente, num box, para o número não viajar sozinho.
+
+**O comparador que faltava era o uniforme**, e ele defende a formulação: perde de 2,4% a 5,5%
+em todos os cortes. Sem ele, alguém poderia concluir que o ganho vem de distribuir. Vem de
+escolher *quais* horas.
+
+Nota de método: o documento usa duas cores categóricas (solver, uniforme) e desenha o oráculo
+como referência tracejada neutra. Não é economia de paleta — o oráculo não é uma estratégia
+escolhível, é um limite, e dar a ele o mesmo peso visual das outras duas sugeriria que dá para
+optar por ele. A paleta passou no validador de daltonismo nos dois temas.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
