@@ -950,6 +950,46 @@ Dois defeitos encontrados na verificação:
 As 62 linhas de CSS da fita foram removidas junto: código morto em folha de estilo não
 aparece em typecheck nem em teste.
 
+## 42. A ingestão morria em silêncio, e o `/health` mentia
+
+Descoberto ao preparar a coleta contínua até a demo: o `/health` reportava
+`ingestao: "ativa"` enquanto o último bloco tinha **4,6 horas**. Nos logs,
+`SocketClosedError: The socket has been closed.` — o WebSocket caiu, a reconexão do viem
+esgotou as tentativas, `watchBlocks` ficou morto para sempre, e o `onError` da ingestão só
+imprimia o erro. Nada recuperava.
+
+**Dois defeitos independentes, e o segundo é o pior:**
+
+1. **Nada refazia a assinatura.** Perdidas as tentativas do viem, a ingestão só voltava com
+   reinício manual do contêiner.
+2. **O `/health` reportava `config.ingestaoAtiva`** — uma flag que diz se a ingestão foi
+   *ligada*, não se está *funcionando*. O painel exibiu "ingestão ativa" com bolinha verde
+   durante as 4,6 horas paradas. O único sinal honesto na tela era a defasagem em minutos,
+   que ninguém olha quando o indicador ao lado diz que está tudo bem.
+
+**Correção — um vigia, não um `try/catch` melhor.** Um temporizador verifica a cada 30 s se
+chegou bloco nos últimos 90 s (~7 blocos de folga, para não atropelar a reconexão do próprio
+viem); se não chegou, encerra a assinatura e cria outra. O critério é **"chegou bloco?"**, e
+não "houve erro?", o que cobre também a morte silenciosa: socket aberto que simplesmente
+para de entregar `newHeads` — caso em que nenhum erro é emitido.
+
+`estadoDaIngestao()` passou a expor o estado real, e o `/health` ganhou um terceiro valor:
+`ativa`, `travada` ou `desligada`. `travada` é o que faltava — antes esse estado se
+disfarçava de `ativa`.
+
+**`restart: unless-stopped`** nos três serviços do compose. Não havia política nenhuma: um
+reboot deixava tudo parado, e a ingestão morria até alguém reparar.
+
+**Verificação.** O vigia foi testado baixando o limiar para 4 s: ele disparou, encerrou a
+assinatura, refez, e os blocos continuaram entrando (`reconexoes=6`, defasagem 0 min).
+Restaurados os limiares reais, zero reconexões espúrias em 100 s de observação.
+
+Duas tentativas de testar a política de restart falharam, e por motivos que valem registrar:
+`docker kill` é tratado pelo daemon como **parada manual**, então `unless-stopped`
+corretamente não reinicia; e `kill -9 1` de dentro do contêiner não faz nada, porque o kernel
+não entrega a PID 1 sinais sem handler vindos do próprio namespace. A política está aplicada
+(`docker inspect` confirma), mas o teste de reinício do daemon exige sudo e ficou por fazer.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
@@ -962,6 +1002,8 @@ aparece em typecheck nem em teste.
   N`, mas recalibrar a decisão 6 é decisão de produto — pendente
 - ~~Recalibrar o teto (decisão 6)~~ — feito (decisão 34): 30% → 10% de N. Refazer com ~4
   semanas de corpus e grade mais fina
+- **Chave da Alchemy aparece nos logs** — o erro do viem despeja a URL do WebSocket inteira,
+  com a chave. Vale redigir antes de compartilhar log ou tela na demo
 - **Qualidade do estimador é o gargalo** (decisão 34) — o oráculo acha +45% em 12h e o plano
   captura 4%. Nenhum ajuste de teto fecha essa distância; é previsão, e previsão precisa de
   histórico (decisão 8 pede ~4 semanas, temos 5 dias)

@@ -16,6 +16,7 @@ import {
 } from "./db.js";
 import { cotacaoEthUsd, gweiParaUsd } from "./cotacao.js";
 import { assinar, totalAssinantes } from "./eventos.js";
+import { estadoDaIngestao } from "./ingestao.js";
 import { clienteHttp } from "./rpc.js";
 import {
   SolverIndisponivelError,
@@ -112,7 +113,15 @@ app.get("/health", async (_req, res) => {
       defasagem_minutos: r.rows[0].ultimo
         ? Number(((Date.now() - r.rows[0].ultimo.getTime()) / 60_000).toFixed(1))
         : null,
-      ingestao: config.ingestaoAtiva ? "ativa" : "desligada",
+      // O estado REAL da assinatura, não a flag de configuração. Ver o
+      // comentário em `estadoDaIngestao`: a flag dizia "ativa" enquanto a
+      // ingestão estava morta havia horas.
+      ingestao: !config.ingestaoAtiva
+        ? "desligada"
+        : estadoDaIngestao().viva
+          ? "ativa"
+          : "travada",
+      reconexoes_ingestao: estadoDaIngestao().reconexoes,
       solver: solverOk ? "ok" : "inalcancavel",
       assinantes_sse: totalAssinantes(),
     });

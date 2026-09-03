@@ -12,13 +12,51 @@ import { PERCENTIS, buscarFeeHistory, clienteWs } from "./rpc.js";
  * arquitetura: previsibilidade no momento da decisão), ao custo de
  * eventualmente gravar um bloco que sofre reorg -- raro e raso pós-merge.
  */
-export function iniciarIngestaoAoVivo(): () => void {
+
+/**
+ * Sem sinal de vida por este tempo, a assinatura é considerada morta.
+ *
+ * Blocos chegam a cada ~12s. 90s são sete blocos e meia: folga suficiente para
+ * não brigar com a reconexão do próprio viem, que tenta antes de desistir, e
+ * curto o bastante para o buraco na série ser irrelevante.
+ */
+const SEM_SINAL_MS = 90_000;
+const INTERVALO_DO_VIGIA_MS = 30_000;
+
+let ultimoSinalEm = 0;
+let reconexoes = 0;
+let assinaturaViva = false;
+
+/**
+ * Estado REAL da ingestão, para o /health não mentir.
+ *
+ * Antes o /health reportava `config.ingestaoAtiva` -- uma flag de configuração,
+ * que diz se a ingestão foi LIGADA, não se ela está funcionando. Em 02/09/2026
+ * o WebSocket caiu, o viem esgotou as tentativas de reconexão, e o painel
+ * seguiu exibindo "ingestão ativa" com bolinha verde por 4,6 horas sem gravar
+ * um único bloco. O único sinal honesto na tela era a defasagem em minutos.
+ */
+export function estadoDaIngestao() {
+  return {
+    viva: assinaturaViva && Date.now() - ultimoSinalEm < SEM_SINAL_MS,
+    ultimoSinalEm: ultimoSinalEm ? new Date(ultimoSinalEm).toISOString() : null,
+    reconexoes,
+  };
+}
+
+function assinar(): () => void {
   const cliente = clienteWs();
   let blocosGravados = 0;
+  assinaturaViva = true;
+  ultimoSinalEm = Date.now();
 
   const parar = cliente.watchBlocks({
     emitMissed: true,          // recupera blocos perdidos numa queda de conexão
     onBlock: async (bloco) => {
+      // Bloco chegou: a assinatura está viva, mesmo que este bloco venha a ser
+      // descartado abaixo. É sinal de conexão, não de gravação.
+      ultimoSinalEm = Date.now();
+
       try {
         if (bloco.number === null || bloco.baseFeePerGas === null) return;
 
@@ -64,9 +102,53 @@ export function iniciarIngestaoAoVivo(): () => void {
         console.error(`[ingestao] falha no bloco ${bloco.number}:`, erro);
       }
     },
-    onError: (erro) => console.error("[ingestao] erro na assinatura:", erro),
+    onError: (erro) => {
+      // Só registra: quem decide reconectar é o vigia. O viem tenta se
+      // reconectar sozinho antes de emitir isto, e derrubar a assinatura aqui
+      // atropelaria essa tentativa.
+      console.error("[ingestao] erro na assinatura:", erro);
+      assinaturaViva = false;
+    },
   });
 
   console.log(`[ingestao] assinando newHeads (percentis de tip: ${PERCENTIS.join("/")})`);
   return parar;
+}
+
+/**
+ * Supervisiona a assinatura e a refaz quando ela morre.
+ *
+ * A reconexão do viem é limitada: esgotadas as tentativas, `watchBlocks` fica
+ * morto para sempre e nada no processo percebe. O vigia cobre esse caso e
+ * também a morte SILENCIOSA -- socket que continua aberto mas para de entregar
+ * newHeads --, porque o critério é "chegou bloco?", não "houve erro?".
+ */
+export function iniciarIngestaoAoVivo(): () => void {
+  let pararAssinatura = assinar();
+
+  const vigia = setInterval(() => {
+    const parado = Date.now() - ultimoSinalEm;
+    if (parado < SEM_SINAL_MS) return;
+
+    reconexoes += 1;
+    console.warn(
+      `[ingestao] sem bloco há ${Math.round(parado / 1000)}s — refazendo a ` +
+      `assinatura (reconexão nº ${reconexoes})`,
+    );
+
+    try {
+      pararAssinatura();
+    } catch (erro) {
+      // A assinatura antiga pode já estar em estado inválido; não pode impedir
+      // a nova de subir.
+      console.error("[ingestao] falha ao encerrar a assinatura anterior:", erro);
+    }
+    pararAssinatura = assinar();
+  }, INTERVALO_DO_VIGIA_MS);
+
+  return () => {
+    clearInterval(vigia);
+    assinaturaViva = false;
+    pararAssinatura();
+  };
 }
