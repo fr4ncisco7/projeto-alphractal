@@ -16,7 +16,9 @@ uma rede interna que o compose cria, onde cada serviço é alcançável pelo pr�
 | `solver-python` | build de `apps/solver` | `8000` | Estima o custo futuro do gas e resolve o MILP que distribui as transações |
 | `backend-node` | build de `apps/backend-node` | `3000` | Ingere blocos do Ethereum, expõe a API e orquestra o solver |
 
-O **frontend não sobe pelo compose** — está sendo feito em paralelo e roda fora, em dev.
+O **frontend não sobe pelo compose**: ele roda em dev pelo Vite, fora dos contêineres, e
+tem a sua própria seção mais abaixo. Sem ele os três serviços acima continuam funcionando —
+a API responde e a ingestão grava —, mas não há painel para ver.
 
 ## Por que a porta do banco é 5433
 
@@ -108,6 +110,37 @@ Você normalmente **não chama esse endpoint direto** — quem chama é o backen
 - `POST /otimizar` — lê a série do banco, chama o solver, devolve o plano
 - **Ingestão ao vivo** — assina `newHeads` por WebSocket e grava cada bloco novo
 - **Backfill** — comando separado, sob demanda, para preencher o passado
+
+---
+
+# 4.1 O painel (frontend)
+
+Fora do compose, com Node 20+ na sua máquina:
+
+```bash
+cd apps/frontend
+cp .env.example .env      # aponta para http://localhost:3000
+npm ci
+npm run dev               # abre em http://localhost:5173
+```
+
+**O passo do `.env` não é opcional, e errá-lo falha em silêncio.** Sem `VITE_API_URL` a
+aplicação cai no backend **simulado** de `src/lib/mockBackend.ts` — ela abre bonita, os
+gráficos se movem, e nada daquilo é a mainnet. Não há mensagem de erro, porque o modo
+simulado existe de propósito para desenvolver a interface sem Docker.
+
+Como saber em qual modo você está: a tela de abertura verifica o backend de verdade. Se ela
+mostrar `Backend e banco — N blocos · ingestão ativa`, você está no dado real. Se abrir
+direto no painel sem essa verificação, é o simulado.
+
+As rotas:
+
+| Rota | O que é |
+| --- | --- |
+| `/` | Apresentação do projeto. Abre mesmo com a stack inteira desligada |
+| `/painel` | Gas ao vivo, com o gráfico por bloco e o plano do otimizador |
+| `/painel/analise` | Padrão por hora do dia, calendário e consistência |
+| `/painel/predicoes` | O otimizador: parâmetros, plano e a justificativa das horas |
 
 ---
 
