@@ -990,6 +990,56 @@ corretamente não reinicia; e `kill -9 1` de dentro do contêiner não faz nada,
 não entrega a PID 1 sinais sem handler vindos do próprio namespace. A política está aplicada
 (`docker inspect` confirma), mas o teste de reinício do daemon exige sudo e ficou por fazer.
 
+## 43. "Zero de economia" não era defeito — mas a explicação na tela era falsa
+
+Relato: o solver devolveu **0% de economia duas vezes seguidas**, com parâmetros diferentes,
+e pareceu quebrado. Investigado, e vale registrar porque a primeira hipótese estava errada.
+
+**Não é não-determinismo.** Cinco chamadas idênticas devolvem resultado idêntico
+(`economia +55,42%`, mesma previsão, mesmo plano). O que mudava entre as chamadas do relato
+era a **hora**: uma hora nova entrou na série e a previsão inteira se deslocou. Travado por
+teste de regressão em `app.test.ts`.
+
+**A causa real são duas, e as duas são consequências conhecidas de decisões anteriores:**
+
+**1. O teto de 10% de N obriga a usar ~10 janelas, sempre.** Como `teto = ceil(0,1·N)`, o
+número mínimo de janelas é `N/teto ≈ 10` **independente de N**. Se menos de dez horas
+estiverem previstas mais baratas que agora, a média das dez fica acima do preço atual e a
+trava de dominância descarta o plano — mesmo havendo janelas 4× mais baratas disponíveis,
+porque não há *dez* delas. Medido sobre as 49 origens do corpus:
+
+| teto | janelas obrigatórias | recomenda distribuir |
+|---|---|---|
+| 3 | 17 | 29/49 |
+| **5 (atual)** | **10** | **37/49** |
+| 15 (antigo) | 4 | 48/49 |
+| 50 | 1 | 49/49 |
+
+Ou seja: em ~24% das horas o solver responde "execute agora". É comportamento correto, não
+falha — mas é frequente o bastante para parecer defeito a quem tenta duas vezes.
+
+**2. A previsão oscila muito de uma hora para a outra.** A previsão da janela 0 muda por um
+fator **mediano de 1,38×** entre horas consecutivas, p90 de 3,64× e máximo de 4,78×. A mesma
+pergunta legitimamente dá 0% agora e +55% daqui a uma hora. É o mesmo gargalo do estimador
+medido na decisão 34, visto de outro ângulo.
+
+**O que estava errado de verdade: a frase na tela.** Nos dois lugares o painel dizia *"a hora
+atual já é a mais barata prevista"*, e isso é **falso** na maioria das vezes em que a trava
+dispara — havia janelas mais baratas, só não dez. Quem lia aquilo e via no gráfico ao lado
+uma barra visivelmente menor concluía, com razão, que o sistema estava quebrado. Dizer a
+coisa errada ali é pior que não dizer nada.
+
+`lib/porQueAgora.ts` passou a montar a frase a partir do motivo real, distinguindo os dois
+casos: *"a hora atual é a mais barata em todo o prazo"* quando é verdade, e *"existem N horas
+previstas mais baratas que agora, mas o teto obriga a espalhar por pelo menos M delas — e a
+média dessas M fica acima do preço de agora"* quando é o caso do teto.
+
+**Pendência que isto abre:** o teto de 10% foi calibrado pelo agregado do backtest
+(decisão 34), que mede dinheiro e não utilidade. Ele acerta em não perder dinheiro e cobra o
+preço de responder "execute agora" em um quarto das vezes. Um teto que dependesse do número
+de janelas *genuinamente baratas* no horizonte, em vez de uma fração fixa de N, resolveria os
+dois — mas é mudança de formulação e precisa de corpus maior para calibrar.
+
 ## Pendências em aberto
 
 - ~~Fórmula do índice engenheirado de gas (análogo ao CVDD)~~ — descartado em 01/09 e
@@ -1004,6 +1054,9 @@ não entrega a PID 1 sinais sem handler vindos do próprio namespace. A polític
   semanas de corpus e grade mais fina
 - **Chave da Alchemy aparece nos logs** — o erro do viem despeja a URL do WebSocket inteira,
   com a chave. Vale redigir antes de compartilhar log ou tela na demo
+- **Teto fixo em 10% de N força ~10 janelas sempre** (decisão 43) — em ~24% das horas o
+  solver responde "execute agora" porque não há dez janelas baratas. Um teto sensível ao
+  número de janelas realmente baratas resolveria; é mudança de formulação
 - **Qualidade do estimador é o gargalo** (decisão 34) — o oráculo acha +45% em 12h e o plano
   captura 4%. Nenhum ajuste de teto fecha essa distância; é previsão, e previsão precisa de
   histórico (decisão 8 pede ~4 semanas, temos 5 dias)

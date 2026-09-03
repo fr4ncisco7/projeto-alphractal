@@ -10,6 +10,7 @@ import { apiRequest } from "../lib/api";
 import { endpoints } from "../lib/endpoints";
 import { ApiError } from "../lib/errors";
 import { dataHora, desde, gwei, percentual, usd } from "../lib/formato";
+import { frasePorQueAgora, motivoDoAgora } from "../lib/porQueAgora";
 import type { EstatisticasDia, Otimizacao, Saude, SerieRecente } from "../types";
 import "./pages.css";
 
@@ -322,6 +323,7 @@ function PlanoVitrine({ plano, erro, carregando }: {
   // (empate e plano descartado), e só o campo distingue os dois.
   const distribuir = !plano.executar_agora && plano.economia_pct > 0;
   // Quanto o plano descartado sairia pior que executar tudo agora.
+  const motivo = motivoDoAgora(plano.plano, plano.teto_por_janela);
   const quantoPior =
     plano.custo_baseline_t0_gwei > 0
       ? (plano.custo_distribuido_gwei / plano.custo_baseline_t0_gwei - 1) * 100
@@ -358,7 +360,7 @@ function PlanoVitrine({ plano, erro, carregando }: {
             <>
               <p className="resumo__valor resumo__valor--agora">Execute agora</p>
               <p className="resumo__legenda">
-                A hora atual já é a mais barata prevista no prazo.
+                {motivo ? frasePorQueAgora(motivo) : "Distribuir não compensa neste prazo."}
               </p>
               {plano.executar_agora && (
                 <p className="resumo__nota">

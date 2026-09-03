@@ -11,6 +11,7 @@ import { apiRequest } from "../lib/api";
 import { endpoints } from "../lib/endpoints";
 import { ApiError } from "../lib/errors";
 import { dataHora, gwei, horaCurta, percentual, usd } from "../lib/formato";
+import { frasePorQueAgora, motivoDoAgora } from "../lib/porQueAgora";
 import type { Otimizacao, SerieCalendario } from "../types";
 import "./pages.css";
 
@@ -193,7 +194,7 @@ export function PredictionsPage() {
                       {resultado.economia_usd !== null &&
                         `${percentual(resultado.economia_pct, 2)} · `}
                       {resultado.executar_agora
-                        ? "a hora atual já é a mais barata prevista — o plano é executar tudo agora"
+                        ? "distribuir sairia mais caro — o plano é executar tudo agora"
                         : resultado.economia_pct > 0
                           ? "custo evitado ao distribuir a execução"
                           : "distribuir empata com executar agora no prazo pedido"}
@@ -224,10 +225,13 @@ export function PredictionsPage() {
                     O otimizador montou uma distribuição que custaria{" "}
                     {gwei(resultado.custo_distribuido_gwei)} gwei — mais que os{" "}
                     {gwei(resultado.custo_baseline_t0_gwei)} de executar tudo agora — e a
-                    descartou. O teto de {resultado.teto_por_janela} transações por janela
-                    protege contra erro de previsão, mas quando a hora atual já é a melhor
-                    ele obriga a espalhar para janelas piores; nesse caso o plano devolvido
-                    é o de executar imediatamente.
+                    descartou.{" "}
+                    {(() => {
+                      const m = motivoDoAgora(resultado.plano, resultado.teto_por_janela);
+                      return m ? frasePorQueAgora(m) : "";
+                    })()}{" "}
+                    O teto de {resultado.teto_por_janela} por janela existe para limitar a
+                    exposição a erro de previsão; o preço dele é este.
                   </p>
                 )}
 

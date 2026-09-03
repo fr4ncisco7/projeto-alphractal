@@ -235,3 +235,24 @@ describe("GET /health", () => {
     expect(r.body.status).toBe("degradado");
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe("regressão: o solver é determinístico", () => {
+  it("chamadas idênticas devolvem exatamente o mesmo plano", async () => {
+    // Um usuário relatou "zero de economia duas vezes com valores diferentes" e
+    // a primeira hipótese foi não-determinismo no ajuste do Holt-Winters. Não
+    // era -- a série tinha avançado uma hora entre as chamadas. Este teste trava
+    // a propriedade para a hipótese não precisar ser reinvestigada.
+    const corpo = { n_transacoes: 50, horas_ate_deadline: 24, gas_used: 21000 };
+    const [a, b, c] = await Promise.all([
+      request(app).post("/otimizar").send(corpo),
+      request(app).post("/otimizar").send(corpo),
+      request(app).post("/otimizar").send(corpo),
+    ]);
+
+    expect(a.status).toBe(200);
+    expect(b.body).toEqual(a.body);
+    expect(c.body).toEqual(a.body);
+  });
+});
